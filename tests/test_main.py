@@ -78,10 +78,14 @@ class BacktesterGUI(tk.Tk):
             messagebox.showerror("데이터 오류", str(e))
             return
 
-        close = df['Close']
-        bb = BollingerBands(close=close, window=boll_window, window_dev=boll_std)
-        df['bb_high'] = bb.bollinger_hband()
-        df['bb_low'] = bb.bollinger_lband()
+        # 종가 시리즈와 밴드 시리즈 준비
+        prices = df['Close']
+        if isinstance(prices, pd.DataFrame):
+            prices = prices.squeeze()
+
+        bb = BollingerBands(close=prices, window=boll_window, window_dev=boll_std)
+        highs = bb.bollinger_hband()
+        lows = bb.bollinger_lband()
 
         # 초기 자산 설정
         initial_cash = 100000  # 시작 현금 (원화 기준)
@@ -91,35 +95,39 @@ class BacktesterGUI(tk.Tk):
         self.output.delete('1.0', tk.END)
 
         # 시뮬레이션
-        for idx in df.index:
-            price = df.at[idx, 'Close']
-            low = df.at[idx, 'bb_low']
-            high = df.at[idx, 'bb_high']
+        for date in prices.index:
+            price = prices.loc[date]
+            low = lows.loc[date]
+            high = highs.loc[date]
 
             if show_log:
-                self.output.insert(tk.END, f"{idx.date()}  Close:{price:.2f}  BB_low:{low:.2f}  BB_high:{high:.2f}\n")
+                self.output.insert(tk.END,
+                    f"{date.date()}  Close:{price:.2f}  BB_low:{low:.2f}  BB_high:{high:.2f}\n")
 
-            # 밴드 하단 돌파: 보유 현금의 10% 매수
+            # 밴드 하단 돌파 시 → 보유 현금의 10% 매수
             if price < low and cash > 0:
                 buy_amount = cash * 0.1
                 buy_coin = buy_amount / price
                 coin += buy_coin
                 cash -= buy_amount
-                trades.append((idx, 'BUY', price, buy_coin))
-                self.output.insert(tk.END, f"[BUY] {idx.date()}  {buy_coin:.6f} BTC at {price:.2f}\n")
+                trades.append((date, 'BUY', price, buy_coin))
+                self.output.insert(tk.END,
+                    f"[BUY] {date.date()}  {buy_coin:.6f} BTC at {price:.2f}\n")
 
-            # 밴드 상단 돌파: 보유 코인의 10% 매도
+            # 밴드 상단 돌파 시 → 보유 코인의 10% 매도
             elif price > high and coin > 0:
                 sell_coin = coin * 0.1
                 cash += sell_coin * price
                 coin -= sell_coin
-                trades.append((idx, 'SELL', price, sell_coin))
-                self.output.insert(tk.END, f"[SELL] {idx.date()}  {sell_coin:.6f} BTC at {price:.2f}\n")
+                trades.append((date, 'SELL', price, sell_coin))
+                self.output.insert(tk.END,
+                    f"[SELL] {date.date()}  {sell_coin:.6f} BTC at {price:.2f}\n")
 
         # 최종 평가
-        final_value = cash + coin * df['Close'].iloc[-1]
+        final_value = cash + coin * prices.iloc[-1]
         ret_pct = (final_value - initial_cash) / initial_cash * 100
-        self.output.insert(tk.END, f"\n최종 자산: {final_value:.2f} (수익률: {ret_pct:.2f}%)")
+        self.output.insert(tk.END,
+            f"\n최종 자산: {final_value:.2f} (수익률: {ret_pct:.2f}%)")
 
 if __name__ == '__main__':
     app = BacktesterGUI()

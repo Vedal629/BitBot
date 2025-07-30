@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>코인 매매 시뮬레이터 (MA + Bollinger Band + 로그)</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>코인 매매 시뮬레이터</h1>
+    <form id="sim-form">
+        초기 자본: <input type="number" name="balance" value="10000" required><br>
+        이동평균선 기간: <input type="number" name="ma_period" value="20" required><br>
+        볼린저밴드 K값: <input type="number" step="0.1" name="bb_k" value="2" required><br>
+        시작 날짜: <input type="date" name="start_date" required><br>
+        종료 날짜: <input type="date" name="end_date" required><br>
+        <button type="submit">시뮬레이션 실행</button>
+    </form>
+    <div id="result"></div>
+    <div id="trade-log"></div>
+
+    <script>
+        document.getElementById("sim-form").onsubmit = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const response = await fetch("/simulate", {
+                method: "POST",
+                body: formData
+            });
+            const result = await response.json();
+            document.getElementById("result").innerHTML =
+                `최종 자산: ${result.final_value} USDT<br>수익: ${result.profit} USDT`;
+
+            // 거래 로그 출력
+            const logDiv = document.getElementById("trade-log");
+            if (result.trades && result.trades.length) {
+                let html = `<h2>거래 내역</h2><table><tr><th>날짜</th><th>종류</th><th>가격 (USDT)</th></tr>`;
+                result.trades.forEach(t => {
+                    html += `<tr><td>${t.date}</td><td>${t.type}</td><td>${t.price.toFixed(2)}</td></tr>`;
+                });
+                html += `</table>`;
+                logDiv.innerHTML = html;
+            } else {
+                logDiv.innerHTML = `<p>거래 내역이 없습니다.</p>`;
+            }
+        };
+    </script>
+</body>
+</html>

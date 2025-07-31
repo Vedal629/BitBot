@@ -17,10 +17,25 @@ mean20 = btc["Close"].rolling(window=20).mean()
 std20 = btc["Close"].rolling(window=20).std()
 btc["bb_lower"] = mean20 - 2 * std20
 btc["bb_upper"] = mean20 + 2 * std20
+btc["vol_ma20"] = btc["Volume"].rolling(window=20).mean()
 
 # 조건 설정
-btc["buy"] = (btc["Close"] < btc["ma15"]) & (btc["Close"] < btc["ma50"]) & (btc["Close"] < btc["bb_lower"])
-btc["sell"] = (btc["Close"] > btc["ma15"]) & (btc["Close"] > btc["ma50"]) & (btc["Close"] > btc["bb_upper"])
+btc["buy"] = (
+    (btc["Close"] < btc["ma15"]) &
+    (btc["Close"] < btc["ma50"]) &
+    (btc["Close"] < btc["bb_lower"]) &
+    (btc["Volume"] > btc["vol_ma20"])
+)
+btc["sell"] = (
+    (btc["Close"] > btc["ma15"]) &
+    (btc["Close"] > btc["ma50"]) &
+    (btc["Close"] > btc["bb_upper"]) &
+    (btc["Volume"] > btc["vol_ma20"])
+)
+
+# NaN 값은 매수/매도 조건을 만족하지 않는 것으로 간주
+btc["buy"].fillna(False, inplace=True)
+btc["sell"].fillna(False, inplace=True)
 
 # 초기 자산
 cash = 10000

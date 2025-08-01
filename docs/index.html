@@ -2,74 +2,127 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>BTC/USDT 일봉 차트</title>
-  <!-- PapaParse (CSV 파싱) -->
+  <title>코인 매매 시뮬레이터 (MA + Bollinger Band + 로그)</title>
+  <!-- CSV 파싱용 PapaParse -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-  <!-- Chart.js (차트 렌더링) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-    }
-    h1 {
-      text-align: center;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto;
-      max-width: 100%;
-      height: auto;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    form   { margin-bottom: 20px; }
+    table  { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th     { background-color: #f2f2f2; }
   </style>
 </head>
 <body>
-  <h1>BTC/USDT 종가 차트</h1>
-  <canvas id="btcChart" width="800" height="400"></canvas>
+  <h1>코인 매매 시뮬레이터</h1>
+  <form id="sim-form">
+    초기 자본: <input type="number" name="balance" value="10000" required><br>
+    이동평균선 기간: <input type="number" name="ma_period" value="20" required><br>
+    볼린저밴드 K값: <input type="number" step="0.1" name="bb_k" value="2" required><br>
+    시작 날짜: <input type="date" name="start_date" required><br>
+    종료 날짜: <input type="date" name="end_date" required><br>
+    <button type="submit">시뮬레이션 실행</button>
+  </form>
+
+  <div id="result"></div>
+  <div id="trade-log"></div>
 
   <script>
-    // docs/data/BTC_USDT.csv 경로로 fetch
-    fetch('data/BTC_USDT.csv')
-      .then(response => response.text())
-      .then(csvText => {
-        // CSV 파싱 (header: 첫 줄을 키로 사용, dynamicTyping: 숫자를 숫자로)
-        const parsed = Papa.parse(csvText, {
-          header: true,
-          dynamicTyping: true
-        }).data;
+  // 1) CSV를 불러와 파싱
+  async function loadData() {
+    const csv = await fetch('data/BTC_USDT.csv').then(r => r.text());
+    return Papa.parse(csv, { header: true, dynamicTyping: true }).data;
+  }
 
-        // 라벨(날짜)과 데이터(종가) 추출
-        const labels = parsed.map(row => row.date);
-        const prices = parsed.map(row => row.close);
+  // 2) MA 및 STD 계산
+  function computeIndicators(data, period) {
+    const ma = new Array(data.length).fill(null),
+          std = new Array(data.length).fill(null);
 
-        // Chart.js로 라인 차트 생성
-        new Chart(document.getElementById('btcChart'), {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: '종가 (USDT)',
-              data: prices,
-              tension: 0.1
-            }]
-          },
-          options: {
-            scales: {
-              x: {
-                display: true,
-                title: { display: true, text: '날짜' }
-              },
-              y: {
-                display: true,
-                title: { display: true, text: '가격 (USDT)' }
-              }
-            }
-          }
-        });
-      })
-      .catch(err => {
-        console.error('CSV 로딩/파싱 중 오류:', err);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) {
+      sum += data[i].close;
+      if (i >= period) sum -= data[i - period].close;
+      if (i >= period - 1) {
+        ma[i] = sum / period;
+        // std
+        let acc = 0;
+        for (let j = i - period + 1; j <= i; j++) {
+          acc += (data[j].close - ma[i]) ** 2;
+        }
+        std[i] = Math.sqrt(acc / period);
+      }
+    }
+    return { ma, std };
+  }
+
+  // 3) 시뮬레이션 로직
+  function simulate(data, balance, ma_period, bb_k, from, to) {
+    // 날짜 필터
+    const filtered = data.filter(r => {
+      const d = new Date(r.date);
+      return d >= new Date(from) && d <= new Date(to);
+    });
+    const { ma, std } = computeIndicators(filtered, ma_period);
+
+    let coin = 0, trades = [];
+    for (let i = ma_period; i < filtered.length; i++) {
+      const r = filtered[i];
+      const date = r.date.split('T')[0];
+      if (r.close < ma[i] && r.close < (ma[i] - bb_k * std[i]) && balance > 0) {
+        // 매수
+        coin = balance / r.close;
+        balance = 0;
+        trades.push({ date, type: 'BUY', price: r.close });
+      }
+      else if (r.close > ma[i] && r.close > (ma[i] + bb_k * std[i]) && coin > 0) {
+        // 매도
+        balance = coin * r.close;
+        coin = 0;
+        trades.push({ date, type: 'SELL', price: r.close });
+      }
+    }
+    const finalValue = balance + coin * filtered[filtered.length - 1].close;
+    return { finalValue, profit: finalValue - parseFloat(document.querySelector('[name=balance]').value), trades };
+  }
+
+  // 4) 폼 제출 처리
+  document.getElementById('sim-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form = e.target;
+    const balance   = parseFloat(form.balance.value),
+          ma_period = parseInt(form.ma_period.value),
+          bb_k      = parseFloat(form.bb_k.value),
+          from      = form.start_date.value,
+          to        = form.end_date.value;
+
+    const data = await loadData();
+    const { finalValue, profit, trades } = simulate(data, balance, ma_period, bb_k, from, to);
+
+    // 결과 출력
+    document.getElementById('result').innerHTML =
+      `최종 자산: ${finalValue.toFixed(2)} USDT<br>수익: ${profit.toFixed(2)} USDT`;
+
+    // 거래 로그
+    const logDiv = document.getElementById('trade-log');
+    if (trades.length) {
+      let html = `<h2>거래 내역</h2>
+                  <table>
+                    <tr><th>날짜</th><th>종류</th><th>가격 (USDT)</th></tr>`;
+      trades.forEach(t => {
+        html += `<tr>
+                   <td>${t.date}</td>
+                   <td>${t.type}</td>
+                   <td>${t.price.toFixed(2)}</td>
+                 </tr>`;
       });
+      html += `</table>`;
+      logDiv.innerHTML = html;
+    } else {
+      logDiv.innerHTML = `<p>거래 내역이 없습니다.</p>`;
+    }
+  });
   </script>
 </body>
 </html>

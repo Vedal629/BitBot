@@ -13,7 +13,7 @@ client = Client()
 app = Flask(
     __name__,
     static_folder="data",
-    static_url_path="/data",
+    static_url_path="docs/data",
     template_folder="templates"
 )
 

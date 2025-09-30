@@ -1,128 +1,435 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>코인 매매 시뮬레이터 (MA + Bollinger Band + 로그)</title>
-  <!-- CSV 파싱용 PapaParse -->
+  <meta charset="UTF-8" />
+  <title>코인 매매 시뮬레이터 + 차트 (SMA + Bollinger)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- CSV 파싱: GitHub Pages에서 동작 (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { text-align: center; }
-    form   { margin-bottom: 20px; }
-    table  { border-collapse: collapse; width: 100%; margin-top: 10px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-    th     { background-color: #f2f2f2; }
+    :root{
+      --bg:#0f1218; --fg:#e6e6e6; --muted:#9aa4b2; --panel:#121622; --border:#202534;
+      --grid:#1f2636; --axis:#273044; --up:#26a69a; --down:#ef5350;
+      --sma:#4ea1ff; --bb:#9b59b6; --bbfill:rgba(155,89,182,.16);
+      --buy:#00c853; --sell:#ff5252;
+    }
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR","Malgun Gothic",sans-serif}
+    .page{max-width:1100px;margin:20px auto;padding:0 12px 24px}
+    h1{margin:0 0 12px 0;font-size:20px}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input[type="number"],input[type="date"]{
+      width:100%;box-sizing:border-box;background:#0f1218;color:var(--fg);
+      border:1px solid #2a3348;border-radius:10px;padding:8px 10px
+    }
+    button{appearance:none;border:1px solid #2a3348;background:#1a2030;color:var(--fg);
+      padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    button:hover{border-color:#4ea1ff}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row > div{flex:1 1 160px}
+    .stat{font-size:14px;line-height:1.7}
+    .chart-wrap{position:relative;background:#121622;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    canvas{display:block;width:100%;height:460px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border:1px solid #2a3348;padding:8px;text-align:center;font-size:13px}
+    th{background:#182032}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #2a3348;background:#1a2030}
+    .pill.buy{border-color:var(--buy);color:var(--buy)}
+    .pill.sell{border-color:var(--sell);color:var(--sell)}
   </style>
 </head>
 <body>
-  <h1>코인 매매 시뮬레이터</h1>
-  <form id="sim-form">
-    초기 자본: <input type="number" name="balance" value="10000" required><br>
-    이동평균선 기간: <input type="number" name="ma_period" value="20" required><br>
-    볼린저밴드 K값: <input type="number" step="0.1" name="bb_k" value="2" required><br>
-    시작 날짜: <input type="date" name="start_date" required><br>
-    종료 날짜: <input type="date" name="end_date" required><br>
-    <button type="submit">시뮬레이션 실행</button>
-  </form>
+  <div class="page">
+    <h1>코인 매매 시뮬레이터 + 차트 (SMA + Bollinger)</h1>
 
-  <div id="result"></div>
-  <div id="trade-log"></div>
+    <!-- 설정 & 실행 -->
+    <div class="card" style="margin-bottom:14px">
+      <form id="sim-form">
+        <div class="grid">
+          <div>
+            <div class="row">
+              <div>
+                <label>초기 자본 (USDT)</label>
+                <input type="number" name="balance" value="10000" min="1" step="0.01" required />
+              </div>
+              <div>
+                <label>SMA 기간</label>
+                <input type="number" name="ma_period" value="20" min="2" max="500" required />
+              </div>
+              <div>
+                <label>Bollinger K (표준편차 배수)</label>
+                <input type="number" name="bb_k" value="2" min="0.1" step="0.1" required />
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="row">
+              <div>
+                <label>시작 날짜</label>
+                <input type="date" name="start_date" required />
+              </div>
+              <div>
+                <label>종료 날짜</label>
+                <input type="date" name="end_date" required />
+              </div>
+              <div style="align-self:flex-end">
+                <button type="submit">시뮬레이션 실행</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </form>
+      <div class="stat" id="result">결과가 여기 표시됩니다.</div>
+    </div>
+
+    <!-- 차트 -->
+    <div class="chart-wrap card">
+      <canvas id="chart"></canvas>
+    </div>
+
+    <!-- 거래 로그 -->
+    <div class="card" style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="pill">CSV 경로: <code>data/BTC_USDT.csv</code> (헤더: <code>date,open,high,low,close,volume</code>)</div>
+        <div class="pill">전략: C &lt; SMA &amp; C &lt; 하단밴드 → 매수 / C &gt; SMA &amp; C &gt; 상단밴드 → 매도</div>
+      </div>
+      <div id="trade-log" style="margin-top:8px">거래 내역이 여기 표시됩니다.</div>
+    </div>
+  </div>
 
   <script>
-  // 1) CSV를 불러와 파싱
-  async function loadData() {
-    const csv = await fetch('data/BTC_USDT.csv').then(r => r.text());
-    return Papa.parse(csv, { header: true, dynamicTyping: true }).data;
-  }
-
-  // 2) MA 및 STD 계산
-  function computeIndicators(data, period) {
-    const ma = new Array(data.length).fill(null),
-          std = new Array(data.length).fill(null);
-
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) {
-      sum += data[i].close;
-      if (i >= period) sum -= data[i - period].close;
-      if (i >= period - 1) {
-        ma[i] = sum / period;
-        // std
-        let acc = 0;
-        for (let j = i - period + 1; j <= i; j++) {
-          acc += (data[j].close - ma[i]) ** 2;
-        }
-        std[i] = Math.sqrt(acc / period);
-      }
-    }
-    return { ma, std };
-  }
-
-  // 3) 시뮬레이션 로직
-  function simulate(data, balance, ma_period, bb_k, from, to) {
-    // 날짜 필터
-    const filtered = data.filter(r => {
-      const d = new Date(r.date);
-      return d >= new Date(from) && d <= new Date(to);
-    });
-    const { ma, std } = computeIndicators(filtered, ma_period);
-
-    let coin = 0, trades = [];
-    for (let i = ma_period; i < filtered.length; i++) {
-      const r = filtered[i];
-      const date = r.date.split('T')[0];
-      if (r.close < ma[i] && r.close < (ma[i] - bb_k * std[i]) && balance > 0) {
-        // 매수
-        coin = balance / r.close;
-        balance = 0;
-        trades.push({ date, type: 'BUY', price: r.close });
-      }
-      else if (r.close > ma[i] && r.close > (ma[i] + bb_k * std[i]) && coin > 0) {
-        // 매도
-        balance = coin * r.close;
-        coin = 0;
-        trades.push({ date, type: 'SELL', price: r.close });
-      }
-    }
-    const finalValue = balance + coin * filtered[filtered.length - 1].close;
-    return { finalValue, profit: finalValue - parseFloat(document.querySelector('[name=balance]').value), trades };
-  }
-
-  // 4) 폼 제출 처리
-  document.getElementById('sim-form').addEventListener('submit', async e => {
-    e.preventDefault();
-    const form = e.target;
-    const balance   = parseFloat(form.balance.value),
-          ma_period = parseInt(form.ma_period.value),
-          bb_k      = parseFloat(form.bb_k.value),
-          from      = form.start_date.value,
-          to        = form.end_date.value;
-
-    const data = await loadData();
-    const { finalValue, profit, trades } = simulate(data, balance, ma_period, bb_k, from, to);
-
-    // 결과 출력
-    document.getElementById('result').innerHTML =
-      `최종 자산: ${finalValue.toFixed(2)} USDT<br>수익: ${profit.toFixed(2)} USDT`;
-
-    // 거래 로그
-    const logDiv = document.getElementById('trade-log');
-    if (trades.length) {
-      let html = `<h2>거래 내역</h2>
-                  <table>
-                    <tr><th>날짜</th><th>종류</th><th>가격 (USDT)</th></tr>`;
-      trades.forEach(t => {
-        html += `<tr>
-                   <td>${t.date}</td>
-                   <td>${t.type}</td>
-                   <td>${t.price.toFixed(2)}</td>
-                 </tr>`;
+    // -------------------- CSV 로드 (GitHub Pages에서 동일 출처) --------------------
+    async function loadCSV(path){
+      const text = await fetch(path, {cache:"no-store"}).then(r=>{
+        if(!r.ok) throw new Error("CSV 로드 실패: "+r.status);
+        return r.text();
       });
-      html += `</table>`;
-      logDiv.innerHTML = html;
-    } else {
-      logDiv.innerHTML = `<p>거래 내역이 없습니다.</p>`;
+      const parsed = Papa.parse(text, {header:true, dynamicTyping:true, skipEmptyLines:true});
+      // 기대 헤더: date,open,high,low,close,volume
+      const rows = parsed.data
+        .map(r => ({
+          date: String(r.date),
+          open: Number(r.open),
+          high: Number(r.high),
+          low:  Number(r.low),
+          close:Number(r.close),
+          volume: r.volume != null ? Number(r.volume) : null,
+        }))
+        .filter(r => r.date && Number.isFinite(r.open) && Number.isFinite(r.high) && Number.isFinite(r.low) && Number.isFinite(r.close));
+      // 날짜 오름차순
+      rows.sort((a,b)=> toUnixSec(a.date) - toUnixSec(b.date));
+      return rows;
     }
-  });
+
+    // 날짜 → unix sec (UTC 00:00:00 기준)
+    function toUnixSec(dateStr){
+      // 'YYYY-MM-DD' 가정
+      const [y,m,d] = dateStr.split("-").map(Number);
+      return Math.floor(Date.UTC(y, (m||1)-1, d||1) / 1000);
+    }
+
+    // -------------------- 지표 계산 --------------------
+    function SMA(values, period){
+      const out = Array(values.length).fill(null);
+      let sum = 0;
+      for (let i=0;i<values.length;i++){
+        sum += values[i];
+        if (i >= period) sum -= values[i-period];
+        if (i >= period-1) out[i] = sum / period;
+      }
+      return out;
+    }
+    function rollingStd(values, period, means){
+      const out = Array(values.length).fill(null);
+      let acc = 0, accSq = 0;
+      for (let i=0;i<values.length;i++){
+        const v = values[i];
+        acc += v; accSq += v*v;
+        if (i >= period){
+          const old = values[i-period];
+          acc -= old; accSq -= old*old;
+        }
+        if (i >= period-1){
+          const mean = means[i];
+          const variance = Math.max(0, accSq/period - mean*mean);
+          out[i] = Math.sqrt(variance);
+        }
+      }
+      return out;
+    }
+    function computeIndicators(data, period, bbK){
+      const closes = data.map(d=>d.close);
+      const ma = SMA(closes, period);
+      const sd = rollingStd(closes, period, ma);
+      const bbU = Array(closes.length).fill(null);
+      const bbL = Array(closes.length).fill(null);
+      for (let i=0;i<closes.length;i++){
+        if (ma[i]==null || sd[i]==null) continue;
+        bbU[i] = ma[i] + bbK*sd[i];
+        bbL[i] = ma[i] - bbK*sd[i];
+      }
+      return { ma, sd, bbU, bbL };
+    }
+
+    // -------------------- 시뮬레이션 --------------------
+    function simulate(filtered, balance, ma, sd, bbK){
+      let cash = balance, coin = 0;
+      const trades = [];
+      for (let i=0;i<filtered.length;i++){
+        if (ma[i]==null || sd[i]==null) continue;
+        const c = filtered[i].close;
+        const upper = ma[i] + bbK*sd[i];
+        const lower = ma[i] - bbK*sd[i];
+        const date = filtered[i].date;
+
+        // 매수: C < SMA AND C < 하단밴드
+        if (c < ma[i] && c < lower && cash > 0){
+          coin = cash / c; cash = 0;
+          trades.push({ date, type:"BUY", price:c });
+        }
+        // 매도: C > SMA AND C > 상단밴드
+        else if (c > ma[i] && c > upper && coin > 0){
+          cash = coin * c; coin = 0;
+          trades.push({ date, type:"SELL", price:c });
+        }
+      }
+      const final = cash + (coin>0 ? coin * filtered.at(-1).close : 0);
+      const profit = final - balance;
+      return { final, profit, trades };
+    }
+
+    // -------------------- 차트 유틸/렌더(순수 Canvas) --------------------
+    function niceTicks(min, max, n=6){
+      const span = max - min || 1;
+      const step = Math.pow(10, Math.floor(Math.log10(span/n)));
+      const err = (n*step)/span;
+      const factor = err <= 0.15 ? 10 : err <= 0.35 ? 5 : err <= 0.75 ? 2 : 1;
+      const tick = step * factor;
+      const tmin = Math.floor(min / tick) * tick;
+      const tmax = Math.ceil(max / tick) * tick;
+      const ticks = [];
+      for(let v=tmin; v<=tmax+1e-9; v+=tick) ticks.push(v);
+      return {ticks, min:tmin, max:tmax};
+    }
+    function fmt(v){ return Math.abs(v)>=1000 ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : v.toFixed(2); }
+    function fmtDate(unixSec){
+      const d = new Date(unixSec*1000);
+      const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function drawChart(canvas, rows, ma, bbU, bbL, trades){
+      const ctx = canvas.getContext('2d');
+      const DPR = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * DPR);
+      canvas.height= Math.floor(rect.height * DPR);
+      ctx.setTransform(DPR,0,0,DPR,0,0);
+
+      const PAD = {left:60,right:20,top:20,bottom:24};
+      const W = rect.width, H = rect.height;
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--panel') || '#121622';
+      ctx.fillRect(0,0,W,H);
+
+      if (!rows.length){
+        ctx.fillStyle="#ccc"; ctx.fillText("표시할 데이터가 없습니다.",16,24); return;
+      }
+      const N = rows.length;
+      const times = rows.map(r=>toUnixSec(r.date));
+      const highs = rows.map(r=>r.high);
+      const lows  = rows.map(r=>r.low);
+      const opens = rows.map(r=>r.open);
+      const closes= rows.map(r=>r.close);
+
+      // Y 범위(캔들 + 지표 포함)
+      let yMin = Math.min(...lows), yMax = Math.max(...highs);
+      for(let i=0;i<N;i++){
+        if (ma[i]!=null){ yMin=Math.min(yMin,ma[i]); yMax=Math.max(yMax,ma[i]); }
+        if (bbU[i]!=null){ yMax=Math.max(yMax,bbU[i]); }
+        if (bbL[i]!=null){ yMin=Math.min(yMin,bbL[i]); }
+      }
+      if (!isFinite(yMin)||!isFinite(yMax)||yMin===yMax){ yMin-=1; yMax+=1; }
+
+      const {ticks} = niceTicks(yMin,yMax,6);
+      const plotX0=PAD.left, plotX1=W-PAD.right, plotY0=PAD.top, plotY1=H-PAD.bottom;
+
+      // 그리드/축
+      ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid')||'#1f2636';
+      ctx.lineWidth=1;
+      ticks.forEach(t=>{
+        const y = plotY1 - (t-yMin)/(yMax-yMin)*(plotY1-plotY0);
+        ctx.beginPath(); ctx.moveTo(plotX0,y); ctx.lineTo(plotX1,y); ctx.stroke();
+      });
+      ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axis')||'#273044';
+      ctx.beginPath(); ctx.moveTo(plotX0,plotY0); ctx.lineTo(plotX0,plotY1); ctx.lineTo(plotX1,plotY1); ctx.stroke();
+
+      // Y 라벨
+      ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted')||'#9aa4b2';
+      ctx.font="12px system-ui,sans-serif"; ctx.textAlign="right"; ctx.textBaseline="middle";
+      ticks.forEach(t=>{
+        const y = plotY1 - (t-yMin)/(yMax-yMin)*(plotY1-plotY0);
+        ctx.fillText(fmt(t), plotX0-6, y);
+      });
+
+      // X 라벨
+      const nLabels=8, step=Math.max(1,Math.floor(N/nLabels));
+      ctx.textAlign="center"; ctx.textBaseline="top";
+      for(let i=0;i<N;i+=step){
+        const x = plotX0 + (i+0.5)*(plotX1-plotX0)/N;
+        ctx.fillText(fmtDate(times[i]), x, plotY1+4);
+        ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid')||'#1f2636';
+        ctx.beginPath(); ctx.moveTo(x,plotY0); ctx.lineTo(x,plotY1); ctx.stroke();
+      }
+
+      const xOf=i=> plotX0 + (i+0.5)*(plotX1-plotX0)/N;
+      const yOf=v=> plotY1 - (v-yMin)/(yMax-yMin)*(plotY1-plotY0);
+
+      // 볼린저 채움
+      const bbfill=getComputedStyle(document.documentElement).getPropertyValue('--bbfill')||'rgba(155,89,182,.16)';
+      ctx.fillStyle=bbfill;
+      ctx.beginPath();
+      let started=false;
+      for(let i=0;i<N;i++){
+        if (bbU[i]==null){ started=false; continue; }
+        const x=xOf(i), y=yOf(bbU[i]);
+        if(!started){ ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y);
+      }
+      for(let i=N-1;i>=0;i--){
+        if (bbL[i]==null) continue;
+        ctx.lineTo(xOf(i), yOf(bbL[i]));
+      }
+      if (started){ ctx.closePath(); ctx.fill(); }
+
+      // 캔들
+      const up=getComputedStyle(document.documentElement).getPropertyValue('--up')||'#26a69a';
+      const dn=getComputedStyle(document.documentElement).getPropertyValue('--down')||'#ef5350';
+      const candleW = Math.max(2, Math.floor((plotX1-plotX0)/N*0.6));
+      ctx.lineWidth=1;
+      for(let i=0;i<N;i++){
+        const x=xOf(i);
+        // wick
+        ctx.strokeStyle = closes[i]>=opens[i]?up:dn;
+        ctx.beginPath(); ctx.moveTo(x, yOf(highs[i])); ctx.lineTo(x, yOf(lows[i])); ctx.stroke();
+        // body
+        const top = Math.min(yOf(opens[i]), yOf(closes[i]));
+        const bot = Math.max(yOf(opens[i]), yOf(closes[i]));
+        const h = Math.max(1, bot-top);
+        ctx.fillStyle = closes[i]>=opens[i]?up:dn;
+        ctx.fillRect(x - candleW/2, top, candleW, h);
+      }
+
+      // SMA(= 볼린저 중심선)
+      if (ma.some(v=>v!=null)){
+        ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--sma')||'#4ea1ff';
+        ctx.lineWidth=2; ctx.beginPath();
+        let s=false;
+        for(let i=0;i<N;i++){
+          const v=ma[i]; if(v==null){ s=false; continue; }
+          const x=xOf(i), y=yOf(v);
+          if(!s){ ctx.moveTo(x,y); s=true; } else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      }
+
+      // 볼린저 상/하 라인
+      const bbColor=getComputedStyle(document.documentElement).getPropertyValue('--bb')||'#9b59b6';
+      const drawLine=(arr)=>{
+        ctx.strokeStyle=bbColor; ctx.lineWidth=1.5; ctx.beginPath();
+        let s=false;
+        for(let i=0;i<N;i++){
+          const v=arr[i]; if(v==null){ s=false; continue; }
+          const x=xOf(i), y=yOf(v);
+          if(!s){ ctx.moveTo(x,y); s=true; } else ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+      };
+      if (bbU.some(v=>v!=null)) drawLine(bbU);
+      if (bbL.some(v=>v!=null)) drawLine(bbL);
+
+      // 매매 마커
+      const r2=5;
+      for(const t of trades){
+        const i = rows.findIndex(r=>r.date===t.date);
+        if (i<0) continue;
+        const x=xOf(i), y=yOf(rows[i].close);
+        ctx.beginPath();
+        ctx.fillStyle = t.type==="BUY" ? (getComputedStyle(document.documentElement).getPropertyValue('--buy')||'#00c853')
+                                       : (getComputedStyle(document.documentElement).getPropertyValue('--sell')||'#ff5252');
+        ctx.arc(x, y, r2, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // -------------------- 앱 구동 --------------------
+    let ALL = []; // 전체 CSV
+    (async function init(){
+      try{
+        ALL = await loadCSV("data/BTC_USDT.csv");
+        // 기본 날짜 범위 자동 채움
+        const startInput = document.querySelector('input[name="start_date"]');
+        const endInput   = document.querySelector('input[name="end_date"]');
+        startInput.value = ALL[0]?.date || "";
+        endInput.value   = ALL.at(-1)?.date || "";
+      } catch (e){
+        document.getElementById('result').textContent = "CSV 로드 실패: " + (e.message||e);
+      }
+    })();
+
+    document.getElementById("sim-form").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      if (!ALL.length){
+        document.getElementById('result').textContent = "데이터가 없습니다. CSV 경로를 확인하세요.";
+        return;
+      }
+      const form = e.currentTarget;
+      const balance = Number(form.balance.value);
+      const p  = Math.max(2, Number(form.ma_period.value));
+      const k  = Math.max(0.1, Number(form.bb_k.value));
+      const s  = form.start_date.value;
+      const t  = form.end_date.value;
+
+      // 구간 필터
+      const filtered = ALL.filter(r => r.date >= s && r.date <= t);
+      if (!filtered.length){
+        document.getElementById('result').textContent = "선택한 기간에 데이터가 없습니다.";
+        document.getElementById('trade-log').textContent = "";
+        drawChart(document.getElementById("chart"), [], [], [], [], []);
+        return;
+      }
+      const { ma, sd, bbU, bbL } = computeIndicators(filtered, p, k);
+      const { final, profit, trades } = simulate(filtered, balance, ma, sd, k);
+
+      // 결과
+      const resEl = document.getElementById('result');
+      resEl.innerHTML = `
+        최종 자산: <b>${final.toFixed(2)}</b> USDT &nbsp;|&nbsp;
+        수익: <b style="color:${profit>=0?'#4caf50':'#ff5252'}">${profit.toFixed(2)}</b> USDT
+        <br/><span class="pill">표본 개수: ${filtered.length.toLocaleString()}</span>
+        <span class="pill">SMA(${p}), BB(${p}, ${k})</span>
+      `;
+
+      // 거래 로그
+      const logDiv = document.getElementById('trade-log');
+      if (!trades.length){
+        logDiv.innerHTML = `<p>거래 내역이 없습니다.</p>`;
+      } else {
+        let html = `<table><thead><tr><th>날짜</th><th>종류</th><th>가격(USDT)</th></tr></thead><tbody>`;
+        for (const tr of trades){
+          html += `<tr>
+            <td>${tr.date}</td>
+            <td>${tr.type === 'BUY' ? '<span class="pill buy">BUY</span>' : '<span class="pill sell">SELL</span>'}</td>
+            <td>${tr.price.toFixed(2)}</td>
+          </tr>`;
+        }
+        html += `</tbody></table>`;
+        logDiv.innerHTML = html;
+      }
+
+      // 차트 그리기
+      drawChart(document.getElementById("chart"), filtered, ma, bbU, bbL, trades);
+    });
   </script>
 </body>
 </html>

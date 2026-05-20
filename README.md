@@ -11,11 +11,24 @@ pip install -r requirements.txt
 python main.py
 ```
 
-## HTML 모의 테스트
+## GitHub Pages
 
-브라우저에서 `docs/index.html`을 열면 과거 일봉 데이터 기반 모의 테스트를 할 수 있습니다.
+[https://vedal629.github.io/BitBot/](https://vedal629.github.io/BitBot/)에서 웹 화면을 바로 열 수 있습니다.
 
-설정할 수 있는 항목은 다음과 같습니다.
+GitHub Pages 설정이 `docs` 폴더 기준이든 저장소 루트 기준이든 화면이 보이도록 `docs/index.html`과 루트 `index.html`을 함께 제공합니다.
+
+## HTML 실시간 차트와 모의 테스트
+
+브라우저에서 `docs/index.html`을 열면 Upbit 공개 API 기반 실시간 차트와 과거 캔들 기반 모의 테스트를 할 수 있습니다.
+
+실시간 화면에서 지원하는 항목은 다음과 같습니다.
+
+- KRW-BTC, KRW-ETH, KRW-XRP 실시간 캔들
+- 1분, 5분, 15분, 1시간, 일봉 차트
+- 10초 간격 자동 갱신
+- Upbit API 실패 시 BTC/USDT 샘플 CSV 자동 전환
+
+모의 테스트에서 설정할 수 있는 항목은 다음과 같습니다.
 
 - 테스트 기간: 시작일, 종료일
 - 초기 자산

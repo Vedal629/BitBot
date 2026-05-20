@@ -4,6 +4,4 @@ yfinance
 pandas
 ta
 numpy
-flask
 pyupbit
-python-binance

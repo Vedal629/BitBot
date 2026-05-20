@@ -67,5 +67,3 @@ pd.set_option("display.max_rows", None)
 df_log = pd.DataFrame(entry_log, columns=["날짜", "행동", "금액", "단가"])
 print(df_log)
 
-# 선택 저장
-# df_log.to_csv("btc_log_full_sell.csv", index=False)

@@ -118,7 +118,6 @@
               <option value="KRW-BTC">KRW-BTC 실시간</option>
               <option value="KRW-ETH">KRW-ETH 실시간</option>
               <option value="KRW-XRP">KRW-XRP 실시간</option>
-              <option value="SAMPLE_BTC_USDT">BTC/USDT 샘플 데이터</option>
             </select>
           </div>
           <div class="two">
@@ -160,24 +159,6 @@
       return new Date(`${value}T00:00:00+09:00`);
     };
 
-    async function fetchCsvCandles() {
-      const candidates = ["data/BTC_USDT.csv", "docs/data/BTC_USDT.csv"];
-      let response = null;
-      for (const path of candidates) {
-        response = await fetch(path, { cache: "no-store" }).catch(() => null);
-        if (response && response.ok) break;
-      }
-      if (!response || !response.ok) throw new Error("CSV 데이터를 불러오지 못했습니다.");
-      const text = await response.text();
-      const lines = text.trim().split(/\r?\n/);
-      const headers = lines.shift().split(",");
-      return lines.map((line) => {
-        const values = line.split(",");
-        const row = Object.fromEntries(headers.map((header, index) => [header, values[index]]));
-        return { date: row.date, open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume) };
-      }).filter((row) => Number.isFinite(row.close));
-    }
-
     async function fetchUpbitCandles(market, interval) {
       const path = interval === "days" ? "days" : `minutes/${interval}`;
       const response = await fetch(`https://api.upbit.com/v1/candles/${path}?market=${encodeURIComponent(market)}&count=200`, { cache: "no-store" });
@@ -195,17 +176,15 @@
 
     async function loadCandles(options = {}) {
       const config = readConfig();
-      const useSample = config.market === "SAMPLE_BTC_USDT";
-      $("dataStatus").textContent = useSample ? "샘플 CSV 데이터를 불러오는 중입니다." : `${config.market} 실시간 캔들 데이터를 불러오는 중입니다.`;
+      $("dataStatus").textContent = `${config.market} 실시간 캔들 데이터를 불러오는 중입니다.`;
       try {
-        candles = useSample ? await fetchCsvCandles() : await fetchUpbitCandles(config.market, config.interval);
-        $("marketName").textContent = useSample ? "BTC/USDT" : config.market;
-        $("dataStatus").textContent = useSample ? "샘플 CSV 데이터로 모의 테스트 중입니다." : `${config.market} ${config.interval === "days" ? "일봉" : `${config.interval}분봉`} 실시간 차트입니다.`;
+        candles = await fetchUpbitCandles(config.market, config.interval);
+        $("marketName").textContent = config.market;
+        $("dataStatus").textContent = `${config.market} ${config.interval === "days" ? "일봉" : `${config.interval}분봉`} 실시간 차트입니다.`;
       } catch (error) {
         console.error(error);
-        candles = await fetchCsvCandles();
-        $("marketName").textContent = "BTC/USDT";
-        $("dataStatus").textContent = "실시간 데이터를 불러오지 못해 샘플 CSV로 전환했습니다.";
+        $("dataStatus").textContent = "Upbit 실시간 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
+        throw error;
       }
       if (!candles.length) throw new Error("표시할 캔들 데이터가 없습니다.");
       if (!options.keepDates) {

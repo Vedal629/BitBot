@@ -26,7 +26,6 @@ GitHub Pages 설정이 `docs` 폴더 기준이든 저장소 루트 기준이든 
 - KRW-BTC, KRW-ETH, KRW-XRP 실시간 캔들
 - 1분, 5분, 15분, 1시간, 일봉 차트
 - 10초 간격 자동 갱신
-- Upbit API 실패 시 BTC/USDT 샘플 CSV 자동 전환
 
 모의 테스트에서 설정할 수 있는 항목은 다음과 같습니다.
 

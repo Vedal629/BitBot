@@ -22,11 +22,9 @@
     html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif; letter-spacing: 0; }
     body { overflow-x: hidden; }
     button, input, select { font: inherit; }
-    .topbar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--line); background: #0d1117; position: sticky; top: 0; z-index: 10; }
+    .topbar { height: 56px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--line); background: #0d1117; position: sticky; top: 0; z-index: 10; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; }
     .brand-mark { width: 28px; height: 28px; border-radius: 6px; background: var(--blue); display: grid; place-items: center; color: white; font-weight: 900; }
-    .market-tabs { display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: 14px; }
-    .market-tabs strong { color: white; }
     .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) 360px; gap: 1px; max-width: 1480px; margin: 0 auto; background: var(--line); min-height: calc(100vh - 56px); }
     .main, .side { background: var(--bg); min-width: 0; }
     .ticker-strip { display: grid; grid-template-columns: 180px repeat(5, minmax(100px, 1fr)); gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
@@ -39,8 +37,6 @@
     .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     .panel-title { font-size: 15px; font-weight: 700; }
     .panel-sub { color: var(--muted); font-size: 12px; }
-    .range-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
-    .chip { border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); border-radius: 4px; padding: 5px 9px; font-size: 12px; }
     .chart-wrap { position: relative; height: 520px; background: #0f141b; border: 1px solid var(--line); overflow: hidden; }
     canvas { width: 100%; height: 100%; display: block; }
     .result-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); }
@@ -49,8 +45,8 @@
     .result-card strong { font-size: 22px; color: #fff; }
     .result-card .red { color: var(--red); }
     .result-card .blue { color: var(--blue-2); }
-    .side { display: grid; grid-template-rows: auto auto minmax(0, 1fr); }
-    .form-panel, .history-panel, .guide-panel { background: var(--panel); padding: 16px; border-bottom: 1px solid var(--line); }
+    .side { background: var(--panel); }
+    .form-panel { background: var(--panel); padding: 16px; border-bottom: 1px solid var(--line); }
     .form-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-weight: 800; }
     .mode-pill { background: rgba(0, 98, 223, 0.18); color: #72a8ff; border: 1px solid rgba(11, 116, 255, 0.35); border-radius: 4px; padding: 4px 8px; font-size: 12px; }
     .field { display: grid; gap: 6px; margin-bottom: 12px; }
@@ -66,23 +62,15 @@
     .live-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; margin-top: 10px; }
     .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(14, 203, 129, 0.15); flex: 0 0 auto; }
     .status-text { text-align: right; }
-    .table-wrap { max-height: 330px; overflow: auto; border: 1px solid var(--line); background: #0f141b; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th, td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
-    th { color: var(--muted); font-weight: 600; background: var(--panel-2); position: sticky; top: 0; }
-    th:first-child, td:first-child { text-align: left; }
     .buy { color: var(--red); }
     .sell { color: var(--blue-2); }
-    .guide-panel { color: var(--muted); font-size: 13px; line-height: 1.7; }
-    .guide-panel strong { color: var(--text); }
     @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } .ticker-strip, .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chart-wrap { height: 430px; } }
-    @media (max-width: 620px) { .topbar { height: auto; align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px; } .market-tabs { gap: 10px; flex-wrap: wrap; } .ticker-strip, .result-grid, .two { grid-template-columns: 1fr; } .chart-wrap { height: 360px; } }
+    @media (max-width: 620px) { .topbar { height: auto; padding: 12px; } .ticker-strip, .result-grid, .two { grid-template-columns: 1fr; } .chart-wrap { height: 360px; } }
   </style>
 </head>
 <body>
   <header class="topbar">
     <div class="brand"><div class="brand-mark">B</div><div>BitBot</div></div>
-    <nav class="market-tabs"><strong>거래소</strong><span>코인동향</span><span>투자내역</span><span>자동매매 모의테스트</span></nav>
   </header>
   <div class="layout">
     <main class="main">
@@ -97,7 +85,6 @@
       <section class="chart-panel">
         <div class="panel-head">
           <div><div class="panel-title">실시간 차트와 자동매매 시뮬레이션</div><div class="panel-sub" id="dataStatus">Upbit 실시간 캔들 데이터를 불러오는 중입니다.</div></div>
-          <div class="range-buttons"><span class="chip">일봉</span><span class="chip">SMA</span><span class="chip">RSI</span><span class="chip">익절/손절</span></div>
         </div>
         <div class="chart-wrap"><canvas id="chart" width="1100" height="520"></canvas></div>
       </section>
@@ -110,7 +97,7 @@
     </main>
     <aside class="side">
       <section class="form-panel">
-        <div class="form-title"><span>모의 주문 조건</span><span class="mode-pill">실제 주문 없음</span></div>
+        <div class="form-title"><span>모의 조건</span><span class="mode-pill">자동 갱신</span></div>
         <form id="backtestForm">
           <div class="field">
             <label>마켓</label>
@@ -133,14 +120,8 @@
           <div class="field"><label>수수료(%)</label><input type="number" name="feePct" min="0" max="1" step="0.001" value="0.05" required /></div>
           <button class="submit" type="submit">모의 테스트 실행</button>
           <div class="live-line"><span><span class="live-dot"></span> 공개 시세 자동 갱신</span><span class="status-text" id="lastUpdated">-</span></div>
-          <p class="hint">매수 조건은 SMA 또는 RSI 조건 중 하나만 충족해도 진입합니다. 매도는 익절, 손절, SMA, RSI 중 하나가 충족되면 청산합니다.</p>
         </form>
       </section>
-      <section class="history-panel">
-        <div class="form-title"><span>체결 내역</span><span class="mode-pill" id="tradeSummary">0건</span></div>
-        <div class="table-wrap"><table><thead><tr><th>일자</th><th>구분</th><th>가격</th><th>수량</th></tr></thead><tbody id="tradeRows"></tbody></table></div>
-      </section>
-      <section class="guide-panel"><strong>안내</strong><br />이 화면은 Upbit 공개 시세로 실시간 차트를 갱신하고, 선택한 기간의 캔들로 조건을 검증하는 모의 테스트입니다. 실제 주문은 발생하지 않으며, 슬리피지와 호가 잔량은 반영하지 않습니다.</section>
     </aside>
   </div>
   <script>
@@ -150,6 +131,7 @@
     const ctx = canvas.getContext("2d");
     let candles = [];
     let refreshTimer = null;
+    let lastSuccessfulLoad = null;
     const $ = (id) => document.getElementById(id);
     const fmtMoney = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
     const fmtPct = (value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
@@ -159,11 +141,29 @@
       return new Date(`${value}T00:00:00+09:00`);
     };
 
+    async function fetchJson(url) {
+      const urls = [
+        url,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        `https://corsproxy.io/?${encodeURIComponent(url)}`
+      ];
+      let lastError = null;
+      for (const nextUrl of urls) {
+        try {
+          const response = await fetch(nextUrl, { cache: "no-store" });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return await response.json();
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      throw lastError || new Error("데이터 요청에 실패했습니다.");
+    }
+
     async function fetchUpbitCandles(market, interval) {
       const path = interval === "days" ? "days" : `minutes/${interval}`;
-      const response = await fetch(`https://api.upbit.com/v1/candles/${path}?market=${encodeURIComponent(market)}&count=200`, { cache: "no-store" });
-      if (!response.ok) throw new Error("Upbit 캔들 데이터를 불러오지 못했습니다.");
-      const rows = await response.json();
+      const url = `https://api.upbit.com/v1/candles/${path}?market=${encodeURIComponent(market)}&count=200`;
+      const rows = await fetchJson(url);
       return rows.reverse().map((row) => ({
         date: row.candle_date_time_kst.replace("T", " ").slice(0, interval === "days" ? 10 : 16),
         open: Number(row.opening_price),
@@ -176,15 +176,21 @@
 
     async function loadCandles(options = {}) {
       const config = readConfig();
-      $("dataStatus").textContent = `${config.market} 실시간 캔들 데이터를 불러오는 중입니다.`;
+      if (!options.silent) $("dataStatus").textContent = `${config.market} 실시간 캔들 데이터를 불러오는 중입니다.`;
       try {
         candles = await fetchUpbitCandles(config.market, config.interval);
         $("marketName").textContent = config.market;
         $("dataStatus").textContent = `${config.market} ${config.interval === "days" ? "일봉" : `${config.interval}분봉`} 실시간 차트입니다.`;
+        lastSuccessfulLoad = new Date();
       } catch (error) {
         console.error(error);
-        $("dataStatus").textContent = "Upbit 실시간 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.";
-        throw error;
+        if (candles.length) {
+          const time = lastSuccessfulLoad ? lastSuccessfulLoad.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "이전";
+          $("dataStatus").textContent = `새 데이터 요청이 지연되어 ${time} 데이터를 유지 중입니다.`;
+          return;
+        }
+        $("dataStatus").textContent = "시세 연결을 재시도하는 중입니다.";
+        return;
       }
       if (!candles.length) throw new Error("표시할 캔들 데이터가 없습니다.");
       if (!options.keepDates) {
@@ -248,7 +254,7 @@
         return date >= start && date <= end;
       });
       if (sliced.length < Math.max(config.smaPeriod, config.rsiPeriod) + 2) {
-        alert("선택한 기간이 조건 계산에 너무 짧습니다.");
+        $("dataStatus").textContent = "선택한 기간이 조건 계산에 너무 짧습니다.";
         return;
       }
       let cash = config.initialCash;
@@ -307,7 +313,6 @@
       const marketReturn = ((last.close - sliced[0].close) / sliced[0].close) * 100;
       const winRate = closedTrades > 0 ? (wins / closedTrades) * 100 : 0;
       renderStats({ initialCash: config.initialCash, finalValue, profit, strategyReturn, marketReturn, maxDrawdown, winRate, tradeCount: trades.length, lastClose: last.close });
-      renderTrades(trades);
       drawChart(sliced, equity, trades, config);
     }
 
@@ -325,11 +330,6 @@
       $("maxDrawdown").textContent = fmtPct(result.maxDrawdown);
       $("maxDrawdown").className = "blue";
       $("winRate").textContent = `${result.winRate.toFixed(1)}%`;
-    }
-
-    function renderTrades(trades) {
-      $("tradeSummary").textContent = `${trades.length}건`;
-      $("tradeRows").innerHTML = trades.slice().reverse().map((trade) => `<tr><td>${trade.date}</td><td class="${trade.side === "매수" ? "buy" : "sell"}">${trade.side}</td><td>${fmtMoney(trade.price)}</td><td>${trade.volume.toFixed(6)}</td></tr>`).join("");
     }
 
     function drawChart(data, equity, trades, config) {
@@ -400,17 +400,16 @@
 
     function startLiveRefresh() {
       if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(() => loadCandles({ keepDates: true }).catch((error) => console.error(error)), 10000);
+      refreshTimer = setInterval(() => loadCandles({ keepDates: true, silent: true }), 30000);
     }
 
     form.addEventListener("submit", (event) => { event.preventDefault(); runBacktest(); });
-    form.market.addEventListener("change", () => loadCandles().catch((error) => alert(error.message)));
-    form.interval.addEventListener("change", () => loadCandles().catch((error) => alert(error.message)));
-    refreshButton.addEventListener("click", () => loadCandles({ keepDates: true }).catch((error) => alert(error.message)));
+    form.market.addEventListener("change", () => loadCandles());
+    form.interval.addEventListener("change", () => loadCandles());
+    refreshButton.addEventListener("click", () => loadCandles({ keepDates: true }));
     window.addEventListener("resize", () => { if (candles.length) runBacktest(); });
     loadCandles()
-      .then(startLiveRefresh)
-      .catch((error) => { console.error(error); alert("데이터를 불러오지 못했습니다. GitHub Pages 또는 로컬 서버에서 docs/index.html을 열어주세요."); });
+      .then(startLiveRefresh);
   </script>
 </body>
 </html>

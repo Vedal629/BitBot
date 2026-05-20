@@ -38,7 +38,8 @@
     .panel-title { font-size: 15px; font-weight: 700; }
     .panel-sub { color: var(--muted); font-size: 12px; }
     .chart-wrap { position: relative; height: 520px; background: #0f141b; border: 1px solid var(--line); overflow: hidden; }
-    canvas { width: 100%; height: 100%; display: block; }
+    canvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+    canvas:active { cursor: grabbing; }
     .result-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); }
     .result-card { background: var(--panel); padding: 16px; min-height: 92px; }
     .result-card span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 8px; }
@@ -54,10 +55,11 @@
     .field input, .field select { width: 100%; height: 38px; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 4px; padding: 0 10px; outline: none; }
     .field input:focus, .field select:focus { border-color: var(--blue-2); }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quick-ranges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
+    .quick-ranges button { height: 34px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); color: var(--muted); cursor: pointer; font-weight: 700; font-size: 12px; }
+    .quick-ranges button:hover, .quick-ranges button.active { border-color: var(--blue-2); color: #fff; }
     .submit { width: 100%; height: 46px; border: none; border-radius: 4px; background: var(--blue); color: white; cursor: pointer; font-weight: 800; margin-top: 6px; }
     .submit:hover { background: var(--blue-2); }
-    .ghost-button { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); color: var(--text); cursor: pointer; font-weight: 700; }
-    .ghost-button:hover { border-color: var(--blue-2); color: #fff; }
     .hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 12px; }
     .live-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; margin-top: 10px; }
     .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(14, 203, 129, 0.15); flex: 0 0 auto; }
@@ -65,7 +67,7 @@
     .buy { color: var(--red); }
     .sell { color: var(--blue-2); }
     @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } .ticker-strip, .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chart-wrap { height: 430px; } }
-    @media (max-width: 620px) { .topbar { height: auto; padding: 12px; } .ticker-strip, .result-grid, .two { grid-template-columns: 1fr; } .chart-wrap { height: 360px; } }
+    @media (max-width: 620px) { .topbar { height: auto; padding: 12px; } .ticker-strip, .result-grid, .two { grid-template-columns: 1fr; } .chart-wrap { height: 360px; } .quick-ranges { grid-template-columns: repeat(2, 1fr); } }
   </style>
 </head>
 <body>
@@ -109,10 +111,16 @@
           </div>
           <div class="two">
             <div class="field"><label>차트 간격</label><select name="interval"><option value="1">1분</option><option value="5">5분</option><option value="15">15분</option><option value="60">1시간</option><option value="days">일봉</option></select></div>
-            <div class="field"><label>새로고침</label><button class="ghost-button" type="button" id="refreshButton">실시간 갱신</button></div>
+            <div class="field"><label>초기 자산</label><input type="number" name="initialCash" min="100" step="100" value="10000" required /></div>
+          </div>
+          <div class="quick-ranges" id="quickRanges">
+            <button type="button" data-days="1">1일</button>
+            <button type="button" data-days="7">7일</button>
+            <button type="button" data-days="30" class="active">30일</button>
+            <button type="button" data-days="all">전체</button>
           </div>
           <div class="two"><div class="field"><label>시작일</label><input type="date" name="startDate" required /></div><div class="field"><label>종료일</label><input type="date" name="endDate" required /></div></div>
-          <div class="two"><div class="field"><label>초기 자산</label><input type="number" name="initialCash" min="100" step="100" value="10000" required /></div><div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div></div>
+          <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div>
           <div class="two"><div class="field"><label>SMA 기간</label><input type="number" name="smaPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div></div>
           <div class="two"><div class="field"><label>매수: SMA보다 낮음(%)</label><input type="number" name="buyBelowSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매수: RSI 이하</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
           <div class="two"><div class="field"><label>매도: SMA보다 높음(%)</label><input type="number" name="sellAboveSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매도: RSI 이상</label><input type="number" name="sellRsi" min="1" max="100" step="0.1" value="70" required /></div></div>
@@ -126,10 +134,19 @@
   </div>
   <script>
     const form = document.querySelector("#backtestForm");
-    const refreshButton = document.querySelector("#refreshButton");
+    const quickRanges = document.querySelector("#quickRanges");
     const canvas = document.querySelector("#chart");
     const ctx = canvas.getContext("2d");
     let candles = [];
+    let lastChartData = null;
+    let lastChartEquity = null;
+    let lastChartTrades = null;
+    let lastChartConfig = null;
+    let chartViewStart = 0;
+    let chartViewSize = 90;
+    let dragStartX = 0;
+    let dragStartView = 0;
+    let isDraggingChart = false;
     let refreshTimer = null;
     let lastSuccessfulLoad = null;
     const $ = (id) => document.getElementById(id);
@@ -139,6 +156,12 @@
       if (value.includes("T")) return new Date(`${value}+09:00`);
       if (value.includes(" ")) return new Date(`${value.replace(" ", "T")}+09:00`);
       return new Date(`${value}T00:00:00+09:00`);
+    };
+    const formatDateInput = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
     };
 
     async function fetchJson(url) {
@@ -162,9 +185,19 @@
 
     async function fetchUpbitCandles(market, interval) {
       const path = interval === "days" ? "days" : `minutes/${interval}`;
-      const url = `https://api.upbit.com/v1/candles/${path}?market=${encodeURIComponent(market)}&count=200`;
-      const rows = await fetchJson(url);
-      return rows.reverse().map((row) => ({
+      let to = "";
+      const pages = [];
+      for (let page = 0; page < 3; page += 1) {
+        const params = new URLSearchParams({ market, count: "200" });
+        if (to) params.set("to", to);
+        const rows = await fetchJson(`https://api.upbit.com/v1/candles/${path}?${params.toString()}`);
+        if (!Array.isArray(rows) || rows.length === 0) break;
+        pages.push(...rows);
+        to = rows[rows.length - 1].candle_date_time_utc;
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+      const uniqueRows = Array.from(new Map(pages.map((row) => [row.timestamp, row])).values());
+      return uniqueRows.reverse().map((row) => ({
         date: row.candle_date_time_kst.replace("T", " ").slice(0, interval === "days" ? 10 : 16),
         open: Number(row.opening_price),
         high: Number(row.high_price),
@@ -194,7 +227,7 @@
       }
       if (!candles.length) throw new Error("표시할 캔들 데이터가 없습니다.");
       if (!options.keepDates) {
-        form.startDate.value = candles[0].date.slice(0, 10);
+        setDateRange(30);
         form.endDate.value = candles[candles.length - 1].date.slice(0, 10);
       }
       $("lastUpdated").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
@@ -313,6 +346,12 @@
       const marketReturn = ((last.close - sliced[0].close) / sliced[0].close) * 100;
       const winRate = closedTrades > 0 ? (wins / closedTrades) * 100 : 0;
       renderStats({ initialCash: config.initialCash, finalValue, profit, strategyReturn, marketReturn, maxDrawdown, winRate, tradeCount: trades.length, lastClose: last.close });
+      lastChartData = sliced;
+      lastChartEquity = equity;
+      lastChartTrades = trades;
+      lastChartConfig = config;
+      chartViewSize = Math.min(90, sliced.length);
+      chartViewStart = Math.max(0, sliced.length - chartViewSize);
       drawChart(sliced, equity, trades, config);
     }
 
@@ -333,6 +372,12 @@
     }
 
     function drawChart(data, equity, trades, config) {
+      if (!data.length) return;
+      chartViewSize = Math.min(chartViewSize, data.length);
+      chartViewStart = Math.max(0, Math.min(chartViewStart, data.length - chartViewSize));
+      const viewEnd = chartViewStart + chartViewSize;
+      const visibleData = data.slice(chartViewStart, viewEnd);
+      const visibleEquity = equity.slice(chartViewStart, viewEnd);
       const rect = canvas.getBoundingClientRect();
       const ratio = window.devicePixelRatio || 1;
       canvas.width = rect.width * ratio;
@@ -343,12 +388,13 @@
       const pad = { top: 22, right: 70, bottom: 42, left: 16 };
       const chartW = width - pad.left - pad.right;
       const chartH = height - pad.top - pad.bottom;
-      const prices = data.flatMap((row) => [row.high, row.low]);
+      const prices = visibleData.flatMap((row) => [row.high, row.low]);
       const min = Math.min(...prices);
       const max = Math.max(...prices);
-      const y = (price) => pad.top + ((max - price) / (max - min)) * chartH;
-      const x = (index) => pad.left + (index / Math.max(data.length - 1, 1)) * chartW;
-      const candleW = Math.max(2, Math.min(10, chartW / data.length * 0.65));
+      const priceRange = Math.max(max - min, 1);
+      const y = (price) => pad.top + ((max - price) / priceRange) * chartH;
+      const x = (index) => pad.left + (index / Math.max(visibleData.length - 1, 1)) * chartW;
+      const candleW = Math.max(2, Math.min(10, chartW / visibleData.length * 0.65));
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = "#0f141b";
       ctx.fillRect(0, 0, width, height);
@@ -360,7 +406,7 @@
         const price = max - ((max - min) / 5) * i;
         ctx.fillStyle = "#8b98a9"; ctx.font = "12px system-ui"; ctx.fillText(fmtMoney(price), width - pad.right + 12, gy + 4);
       }
-      data.forEach((row, index) => {
+      visibleData.forEach((row, index) => {
         const cx = x(index);
         const rising = row.close >= row.open;
         ctx.strokeStyle = rising ? "#f6465d" : "#0b74ff";
@@ -371,31 +417,42 @@
         ctx.fillRect(cx - candleW / 2, top, candleW, Math.max(1, bottom - top));
       });
       ctx.strokeStyle = "#f0b90b"; ctx.lineWidth = 1.5; ctx.beginPath();
-      data.forEach((_, index) => {
-        const avg = sma(data, config.smaPeriod, index);
+      let smaStarted = false;
+      visibleData.forEach((_, index) => {
+        const sourceIndex = chartViewStart + index;
+        const avg = sma(data, config.smaPeriod, sourceIndex);
         if (!avg) return;
         const px = x(index); const py = y(avg);
-        if (index === config.smaPeriod - 1) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        if (!smaStarted) {
+          ctx.moveTo(px, py);
+          smaStarted = true;
+        } else {
+          ctx.lineTo(px, py);
+        }
       });
       ctx.stroke();
       trades.forEach((trade) => {
-        const index = data.findIndex((row) => row.date === trade.date);
-        if (index < 0) return;
-        const px = x(index); const py = y(trade.price);
+        const sourceIndex = data.findIndex((row) => row.date === trade.date);
+        if (sourceIndex < chartViewStart || sourceIndex >= viewEnd) return;
+        const px = x(sourceIndex - chartViewStart); const py = y(trade.price);
         ctx.fillStyle = trade.side === "매수" ? "#f6465d" : "#0b74ff";
         ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
       });
-      if (equity.length > 1) {
-        const minEq = Math.min(...equity.map((row) => row.value));
-        const maxEq = Math.max(...equity.map((row) => row.value));
+      if (visibleEquity.length > 1) {
+        const minEq = Math.min(...visibleEquity.map((row) => row.value));
+        const maxEq = Math.max(...visibleEquity.map((row) => row.value));
         const eqY = (value) => pad.top + chartH - ((value - minEq) / Math.max(maxEq - minEq, 1)) * (chartH * 0.22);
         ctx.strokeStyle = "#0ecb81"; ctx.lineWidth = 1.4; ctx.beginPath();
-        equity.forEach((row, index) => { const px = x(index); const py = eqY(row.value); if (index === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+        visibleEquity.forEach((row, index) => { const px = x(index); const py = eqY(row.value); if (index === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
         ctx.stroke();
       }
-      ctx.fillStyle = "#8b98a9"; ctx.font = "12px system-ui"; ctx.fillText(data[0].date, pad.left, height - 16); ctx.fillText(data[data.length - 1].date, width - pad.right - 18, height - 16);
+      ctx.fillStyle = "#8b98a9"; ctx.font = "12px system-ui"; ctx.fillText(visibleData[0].date, pad.left, height - 16); ctx.fillText(visibleData[visibleData.length - 1].date, width - pad.right - 18, height - 16);
       ctx.fillStyle = "#f0b90b"; ctx.fillText(`SMA ${config.smaPeriod}`, pad.left + 8, pad.top + 16);
       ctx.fillStyle = "#0ecb81"; ctx.fillText("자산 곡선", pad.left + 76, pad.top + 16);
+      if (data.length > chartViewSize) {
+        ctx.fillStyle = "#8b98a9";
+        ctx.fillText("차트를 드래그해 과거 구간 이동", pad.left + 150, pad.top + 16);
+      }
     }
 
     function startLiveRefresh() {
@@ -403,10 +460,55 @@
       refreshTimer = setInterval(() => loadCandles({ keepDates: true, silent: true }), 30000);
     }
 
+    function setDateRange(days) {
+      if (!candles.length) return;
+      const lastDate = candles[candles.length - 1].date.slice(0, 10);
+      form.endDate.value = lastDate;
+      if (days === "all") {
+        form.startDate.value = candles[0].date.slice(0, 10);
+      } else {
+        const end = parseDate(lastDate);
+        end.setDate(end.getDate() - Number(days) + 1);
+        form.startDate.value = formatDateInput(end);
+      }
+      quickRanges.querySelectorAll("button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.days === String(days));
+      });
+    }
+
+    function panChart(clientX) {
+      if (!lastChartData || lastChartData.length <= chartViewSize) return;
+      const delta = clientX - dragStartX;
+      const candlesPerPixel = chartViewSize / Math.max(canvas.clientWidth, 1);
+      const nextStart = dragStartView - Math.round(delta * candlesPerPixel);
+      chartViewStart = Math.max(0, Math.min(nextStart, lastChartData.length - chartViewSize));
+      drawChart(lastChartData, lastChartEquity, lastChartTrades, lastChartConfig);
+    }
+
     form.addEventListener("submit", (event) => { event.preventDefault(); runBacktest(); });
     form.market.addEventListener("change", () => loadCandles());
     form.interval.addEventListener("change", () => loadCandles());
-    refreshButton.addEventListener("click", () => loadCandles({ keepDates: true }));
+    quickRanges.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-days]");
+      if (!button) return;
+      setDateRange(button.dataset.days);
+      runBacktest();
+    });
+    form.startDate.addEventListener("change", runBacktest);
+    form.endDate.addEventListener("change", runBacktest);
+    canvas.addEventListener("pointerdown", (event) => {
+      if (!lastChartData || lastChartData.length <= chartViewSize) return;
+      isDraggingChart = true;
+      dragStartX = event.clientX;
+      dragStartView = chartViewStart;
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (!isDraggingChart) return;
+      panChart(event.clientX);
+    });
+    canvas.addEventListener("pointerup", () => { isDraggingChart = false; });
+    canvas.addEventListener("pointercancel", () => { isDraggingChart = false; });
     window.addEventListener("resize", () => { if (candles.length) runBacktest(); });
     loadCandles()
       .then(startLiveRefresh);

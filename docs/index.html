@@ -2,434 +2,357 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>코인 매매 시뮬레이터 + 차트 (SMA + Bollinger)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- CSV 파싱: GitHub Pages에서 동작 (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <title>BitBot 모의 자동매매</title>
   <style>
-    :root{
-      --bg:#0f1218; --fg:#e6e6e6; --muted:#9aa4b2; --panel:#121622; --border:#202534;
-      --grid:#1f2636; --axis:#273044; --up:#26a69a; --down:#ef5350;
-      --sma:#4ea1ff; --bb:#9b59b6; --bbfill:rgba(155,89,182,.16);
-      --buy:#00c853; --sell:#ff5252;
+    :root {
+      --bg: #0b0e11;
+      --panel: #11161d;
+      --panel-2: #171d26;
+      --line: #263241;
+      --text: #d7dde7;
+      --muted: #8b98a9;
+      --blue: #0062df;
+      --blue-2: #0b74ff;
+      --red: #f6465d;
+      --green: #0ecb81;
+      --input: #0f141b;
     }
-    html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
-      font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR","Malgun Gothic",sans-serif}
-    .page{max-width:1100px;margin:20px auto;padding:0 12px 24px}
-    h1{margin:0 0 12px 0;font-size:20px}
-    .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-    @media (max-width:900px){ .grid{grid-template-columns:1fr} }
-    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
-    input[type="number"],input[type="date"]{
-      width:100%;box-sizing:border-box;background:#0f1218;color:var(--fg);
-      border:1px solid #2a3348;border-radius:10px;padding:8px 10px
-    }
-    button{appearance:none;border:1px solid #2a3348;background:#1a2030;color:var(--fg);
-      padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
-    button:hover{border-color:#4ea1ff}
-    .row{display:flex;gap:10px;flex-wrap:wrap}
-    .row > div{flex:1 1 160px}
-    .stat{font-size:14px;line-height:1.7}
-    .chart-wrap{position:relative;background:#121622;border:1px solid var(--border);border-radius:12px;overflow:hidden}
-    canvas{display:block;width:100%;height:460px}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    th,td{border:1px solid #2a3348;padding:8px;text-align:center;font-size:13px}
-    th{background:#182032}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid #2a3348;background:#1a2030}
-    .pill.buy{border-color:var(--buy);color:var(--buy)}
-    .pill.sell{border-color:var(--sell);color:var(--sell)}
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Malgun Gothic", sans-serif; letter-spacing: 0; }
+    body { overflow-x: hidden; }
+    button, input, select { font: inherit; }
+    .topbar { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--line); background: #0d1117; position: sticky; top: 0; z-index: 10; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; }
+    .brand-mark { width: 28px; height: 28px; border-radius: 6px; background: var(--blue); display: grid; place-items: center; color: white; font-weight: 900; }
+    .market-tabs { display: flex; align-items: center; gap: 18px; color: var(--muted); font-size: 14px; }
+    .market-tabs strong { color: white; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) 360px; gap: 1px; max-width: 1480px; margin: 0 auto; background: var(--line); min-height: calc(100vh - 56px); }
+    .main, .side { background: var(--bg); min-width: 0; }
+    .ticker-strip { display: grid; grid-template-columns: 180px repeat(5, minmax(100px, 1fr)); gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
+    .ticker-cell { background: var(--panel); padding: 14px 16px; min-height: 70px; }
+    .ticker-cell span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .ticker-cell strong { font-size: 18px; color: #fff; }
+    .ticker-cell .up { color: var(--red); }
+    .ticker-cell .down { color: var(--blue-2); }
+    .chart-panel { background: var(--panel); border-bottom: 1px solid var(--line); padding: 16px; }
+    .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .panel-title { font-size: 15px; font-weight: 700; }
+    .panel-sub { color: var(--muted); font-size: 12px; }
+    .range-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); border-radius: 4px; padding: 5px 9px; font-size: 12px; }
+    .chart-wrap { position: relative; height: 520px; background: #0f141b; border: 1px solid var(--line); overflow: hidden; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .result-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); }
+    .result-card { background: var(--panel); padding: 16px; min-height: 92px; }
+    .result-card span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+    .result-card strong { font-size: 22px; color: #fff; }
+    .result-card .red { color: var(--red); }
+    .result-card .blue { color: var(--blue-2); }
+    .side { display: grid; grid-template-rows: auto auto minmax(0, 1fr); }
+    .form-panel, .history-panel, .guide-panel { background: var(--panel); padding: 16px; border-bottom: 1px solid var(--line); }
+    .form-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-weight: 800; }
+    .mode-pill { background: rgba(0, 98, 223, 0.18); color: #72a8ff; border: 1px solid rgba(11, 116, 255, 0.35); border-radius: 4px; padding: 4px 8px; font-size: 12px; }
+    .field { display: grid; gap: 6px; margin-bottom: 12px; }
+    .field label { color: var(--muted); font-size: 12px; }
+    .field input, .field select { width: 100%; height: 38px; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 4px; padding: 0 10px; outline: none; }
+    .field input:focus, .field select:focus { border-color: var(--blue-2); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .submit { width: 100%; height: 46px; border: none; border-radius: 4px; background: var(--blue); color: white; cursor: pointer; font-weight: 800; margin-top: 6px; }
+    .submit:hover { background: var(--blue-2); }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 12px; }
+    .table-wrap { max-height: 330px; overflow: auto; border: 1px solid var(--line); background: #0f141b; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 9px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th { color: var(--muted); font-weight: 600; background: var(--panel-2); position: sticky; top: 0; }
+    th:first-child, td:first-child { text-align: left; }
+    .buy { color: var(--red); }
+    .sell { color: var(--blue-2); }
+    .guide-panel { color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .guide-panel strong { color: var(--text); }
+    @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } .ticker-strip, .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chart-wrap { height: 430px; } }
+    @media (max-width: 620px) { .topbar { height: auto; align-items: flex-start; flex-direction: column; gap: 8px; padding: 12px; } .market-tabs { gap: 10px; flex-wrap: wrap; } .ticker-strip, .result-grid, .two { grid-template-columns: 1fr; } .chart-wrap { height: 360px; } }
   </style>
 </head>
 <body>
-  <div class="page">
-    <h1>코인 매매 시뮬레이터 + 차트 (SMA + Bollinger)</h1>
-
-    <!-- 설정 & 실행 -->
-    <div class="card" style="margin-bottom:14px">
-      <form id="sim-form">
-        <div class="grid">
-          <div>
-            <div class="row">
-              <div>
-                <label>초기 자본 (USDT)</label>
-                <input type="number" name="balance" value="10000" min="1" step="0.01" required />
-              </div>
-              <div>
-                <label>SMA 기간</label>
-                <input type="number" name="ma_period" value="20" min="2" max="500" required />
-              </div>
-              <div>
-                <label>Bollinger K (표준편차 배수)</label>
-                <input type="number" name="bb_k" value="2" min="0.1" step="0.1" required />
-              </div>
-            </div>
-          </div>
-          <div>
-            <div class="row">
-              <div>
-                <label>시작 날짜</label>
-                <input type="date" name="start_date" required />
-              </div>
-              <div>
-                <label>종료 날짜</label>
-                <input type="date" name="end_date" required />
-              </div>
-              <div style="align-self:flex-end">
-                <button type="submit">시뮬레이션 실행</button>
-              </div>
-            </div>
-          </div>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">B</div><div>BitBot</div></div>
+    <nav class="market-tabs"><strong>거래소</strong><span>코인동향</span><span>투자내역</span><span>자동매매 모의테스트</span></nav>
+  </header>
+  <div class="layout">
+    <main class="main">
+      <section class="ticker-strip">
+        <div class="ticker-cell"><span>마켓</span><strong id="marketName">BTC/USDT</strong></div>
+        <div class="ticker-cell"><span>마지막 종가</span><strong id="lastClose">-</strong></div>
+        <div class="ticker-cell"><span>기간 수익률</span><strong id="marketReturn">-</strong></div>
+        <div class="ticker-cell"><span>전략 수익률</span><strong id="strategyReturn">-</strong></div>
+        <div class="ticker-cell"><span>거래 횟수</span><strong id="tradeCount">-</strong></div>
+        <div class="ticker-cell"><span>최종 자산</span><strong id="finalValue">-</strong></div>
+      </section>
+      <section class="chart-panel">
+        <div class="panel-head">
+          <div><div class="panel-title">과거 데이터 기반 자동매매 시뮬레이션</div><div class="panel-sub">CSV 일봉 데이터로 조건 충족 시점의 매수/매도를 계산합니다.</div></div>
+          <div class="range-buttons"><span class="chip">일봉</span><span class="chip">SMA</span><span class="chip">RSI</span><span class="chip">익절/손절</span></div>
         </div>
-      </form>
-      <div class="stat" id="result">결과가 여기 표시됩니다.</div>
-    </div>
-
-    <!-- 차트 -->
-    <div class="chart-wrap card">
-      <canvas id="chart"></canvas>
-    </div>
-
-    <!-- 거래 로그 -->
-    <div class="card" style="margin-top:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-        <div class="pill">CSV 경로: <code>data/BTC_USDT.csv</code> (헤더: <code>date,open,high,low,close,volume</code>)</div>
-        <div class="pill">전략: C &lt; SMA &amp; C &lt; 하단밴드 → 매수 / C &gt; SMA &amp; C &gt; 상단밴드 → 매도</div>
-      </div>
-      <div id="trade-log" style="margin-top:8px">거래 내역이 여기 표시됩니다.</div>
-    </div>
+        <div class="chart-wrap"><canvas id="chart" width="1100" height="520"></canvas></div>
+      </section>
+      <section class="result-grid">
+        <div class="result-card"><span>시작 자산</span><strong id="initialAsset">-</strong></div>
+        <div class="result-card"><span>총 손익</span><strong id="profitLoss">-</strong></div>
+        <div class="result-card"><span>최대 낙폭</span><strong id="maxDrawdown">-</strong></div>
+        <div class="result-card"><span>승률</span><strong id="winRate">-</strong></div>
+      </section>
+    </main>
+    <aside class="side">
+      <section class="form-panel">
+        <div class="form-title"><span>모의 주문 조건</span><span class="mode-pill">실제 주문 없음</span></div>
+        <form id="backtestForm">
+          <div class="field"><label>마켓</label><select name="market"><option value="BTC_USDT">BTC/USDT 샘플 데이터</option></select></div>
+          <div class="two"><div class="field"><label>시작일</label><input type="date" name="startDate" required /></div><div class="field"><label>종료일</label><input type="date" name="endDate" required /></div></div>
+          <div class="two"><div class="field"><label>초기 자산</label><input type="number" name="initialCash" min="100" step="100" value="10000" required /></div><div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div></div>
+          <div class="two"><div class="field"><label>SMA 기간</label><input type="number" name="smaPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div></div>
+          <div class="two"><div class="field"><label>매수: SMA보다 낮음(%)</label><input type="number" name="buyBelowSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매수: RSI 이하</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
+          <div class="two"><div class="field"><label>매도: SMA보다 높음(%)</label><input type="number" name="sellAboveSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매도: RSI 이상</label><input type="number" name="sellRsi" min="1" max="100" step="0.1" value="70" required /></div></div>
+          <div class="two"><div class="field"><label>익절(%)</label><input type="number" name="takeProfit" min="0.1" max="100" step="0.1" value="3" required /></div><div class="field"><label>손절(%)</label><input type="number" name="stopLoss" min="0.1" max="100" step="0.1" value="2" required /></div></div>
+          <div class="field"><label>수수료(%)</label><input type="number" name="feePct" min="0" max="1" step="0.001" value="0.05" required /></div>
+          <button class="submit" type="submit">모의 테스트 실행</button>
+          <p class="hint">매수 조건은 SMA 또는 RSI 조건 중 하나만 충족해도 진입합니다. 매도는 익절, 손절, SMA, RSI 중 하나가 충족되면 청산합니다.</p>
+        </form>
+      </section>
+      <section class="history-panel">
+        <div class="form-title"><span>체결 내역</span><span class="mode-pill" id="tradeSummary">0건</span></div>
+        <div class="table-wrap"><table><thead><tr><th>일자</th><th>구분</th><th>가격</th><th>수량</th></tr></thead><tbody id="tradeRows"></tbody></table></div>
+      </section>
+      <section class="guide-panel"><strong>안내</strong><br />이 화면은 과거 일봉 데이터로 조건을 검증하는 모의 테스트입니다. 실제 주문은 발생하지 않으며, 슬리피지와 호가 잔량은 반영하지 않습니다.</section>
+    </aside>
   </div>
-
   <script>
-    // -------------------- CSV 로드 (GitHub Pages에서 동일 출처) --------------------
-    async function loadCSV(path){
-      const text = await fetch(path, {cache:"no-store"}).then(r=>{
-        if(!r.ok) throw new Error("CSV 로드 실패: "+r.status);
-        return r.text();
-      });
-      const parsed = Papa.parse(text, {header:true, dynamicTyping:true, skipEmptyLines:true});
-      // 기대 헤더: date,open,high,low,close,volume
-      const rows = parsed.data
-        .map(r => ({
-          date: String(r.date),
-          open: Number(r.open),
-          high: Number(r.high),
-          low:  Number(r.low),
-          close:Number(r.close),
-          volume: r.volume != null ? Number(r.volume) : null,
-        }))
-        .filter(r => r.date && Number.isFinite(r.open) && Number.isFinite(r.high) && Number.isFinite(r.low) && Number.isFinite(r.close));
-      // 날짜 오름차순
-      rows.sort((a,b)=> toUnixSec(a.date) - toUnixSec(b.date));
-      return rows;
+    const form = document.querySelector("#backtestForm");
+    const canvas = document.querySelector("#chart");
+    const ctx = canvas.getContext("2d");
+    let candles = [];
+    const $ = (id) => document.getElementById(id);
+    const fmtMoney = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
+    const fmtPct = (value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+    const parseDate = (value) => new Date(`${value}T00:00:00Z`);
+
+    async function loadCandles() {
+      const response = await fetch("data/BTC_USDT.csv");
+      const text = await response.text();
+      const lines = text.trim().split(/\r?\n/);
+      const headers = lines.shift().split(",");
+      candles = lines.map((line) => {
+        const values = line.split(",");
+        const row = Object.fromEntries(headers.map((header, index) => [header, values[index]]));
+        return { date: row.date, open: Number(row.open), high: Number(row.high), low: Number(row.low), close: Number(row.close), volume: Number(row.volume) };
+      }).filter((row) => Number.isFinite(row.close));
+      form.startDate.value = candles[0].date;
+      form.endDate.value = candles[candles.length - 1].date;
+      runBacktest();
     }
 
-    // 날짜 → unix sec (UTC 00:00:00 기준)
-    function toUnixSec(dateStr){
-      // 'YYYY-MM-DD' 가정
-      const [y,m,d] = dateStr.split("-").map(Number);
-      return Math.floor(Date.UTC(y, (m||1)-1, d||1) / 1000);
-    }
-
-    // -------------------- 지표 계산 --------------------
-    function SMA(values, period){
-      const out = Array(values.length).fill(null);
+    function sma(data, period, index) {
+      if (index + 1 < period) return null;
       let sum = 0;
-      for (let i=0;i<values.length;i++){
-        sum += values[i];
-        if (i >= period) sum -= values[i-period];
-        if (i >= period-1) out[i] = sum / period;
-      }
-      return out;
-    }
-    function rollingStd(values, period, means){
-      const out = Array(values.length).fill(null);
-      let acc = 0, accSq = 0;
-      for (let i=0;i<values.length;i++){
-        const v = values[i];
-        acc += v; accSq += v*v;
-        if (i >= period){
-          const old = values[i-period];
-          acc -= old; accSq -= old*old;
-        }
-        if (i >= period-1){
-          const mean = means[i];
-          const variance = Math.max(0, accSq/period - mean*mean);
-          out[i] = Math.sqrt(variance);
-        }
-      }
-      return out;
-    }
-    function computeIndicators(data, period, bbK){
-      const closes = data.map(d=>d.close);
-      const ma = SMA(closes, period);
-      const sd = rollingStd(closes, period, ma);
-      const bbU = Array(closes.length).fill(null);
-      const bbL = Array(closes.length).fill(null);
-      for (let i=0;i<closes.length;i++){
-        if (ma[i]==null || sd[i]==null) continue;
-        bbU[i] = ma[i] + bbK*sd[i];
-        bbL[i] = ma[i] - bbK*sd[i];
-      }
-      return { ma, sd, bbU, bbL };
+      for (let i = index - period + 1; i <= index; i += 1) sum += data[i].close;
+      return sum / period;
     }
 
-    // -------------------- 시뮬레이션 --------------------
-    function simulate(filtered, balance, ma, sd, bbK){
-      let cash = balance, coin = 0;
-      const trades = [];
-      for (let i=0;i<filtered.length;i++){
-        if (ma[i]==null || sd[i]==null) continue;
-        const c = filtered[i].close;
-        const upper = ma[i] + bbK*sd[i];
-        const lower = ma[i] - bbK*sd[i];
-        const date = filtered[i].date;
-
-        // 매수: C < SMA AND C < 하단밴드
-        if (c < ma[i] && c < lower && cash > 0){
-          coin = cash / c; cash = 0;
-          trades.push({ date, type:"BUY", price:c });
-        }
-        // 매도: C > SMA AND C > 상단밴드
-        else if (c > ma[i] && c > upper && coin > 0){
-          cash = coin * c; coin = 0;
-          trades.push({ date, type:"SELL", price:c });
-        }
+    function rsi(data, period, index) {
+      if (index < period) return null;
+      let gains = 0;
+      let losses = 0;
+      for (let i = index - period + 1; i <= index; i += 1) {
+        const diff = data[i].close - data[i - 1].close;
+        if (diff >= 0) gains += diff;
+        else losses -= diff;
       }
-      const final = cash + (coin>0 ? coin * filtered.at(-1).close : 0);
-      const profit = final - balance;
-      return { final, profit, trades };
+      if (losses === 0) return 100;
+      const rs = gains / period / (losses / period);
+      return 100 - (100 / (1 + rs));
     }
 
-    // -------------------- 차트 유틸/렌더(순수 Canvas) --------------------
-    function niceTicks(min, max, n=6){
-      const span = max - min || 1;
-      const step = Math.pow(10, Math.floor(Math.log10(span/n)));
-      const err = (n*step)/span;
-      const factor = err <= 0.15 ? 10 : err <= 0.35 ? 5 : err <= 0.75 ? 2 : 1;
-      const tick = step * factor;
-      const tmin = Math.floor(min / tick) * tick;
-      const tmax = Math.ceil(max / tick) * tick;
-      const ticks = [];
-      for(let v=tmin; v<=tmax+1e-9; v+=tick) ticks.push(v);
-      return {ticks, min:tmin, max:tmax};
-    }
-    function fmt(v){ return Math.abs(v)>=1000 ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : v.toFixed(2); }
-    function fmtDate(unixSec){
-      const d = new Date(unixSec*1000);
-      const y = d.getUTCFullYear(), m = String(d.getUTCMonth()+1).padStart(2,'0'), day = String(d.getUTCDate()).padStart(2,'0');
-      return `${y}-${m}-${day}`;
-    }
-
-    function drawChart(canvas, rows, ma, bbU, bbL, trades){
-      const ctx = canvas.getContext('2d');
-      const DPR = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = Math.floor(rect.width * DPR);
-      canvas.height= Math.floor(rect.height * DPR);
-      ctx.setTransform(DPR,0,0,DPR,0,0);
-
-      const PAD = {left:60,right:20,top:20,bottom:24};
-      const W = rect.width, H = rect.height;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--panel') || '#121622';
-      ctx.fillRect(0,0,W,H);
-
-      if (!rows.length){
-        ctx.fillStyle="#ccc"; ctx.fillText("표시할 데이터가 없습니다.",16,24); return;
-      }
-      const N = rows.length;
-      const times = rows.map(r=>toUnixSec(r.date));
-      const highs = rows.map(r=>r.high);
-      const lows  = rows.map(r=>r.low);
-      const opens = rows.map(r=>r.open);
-      const closes= rows.map(r=>r.close);
-
-      // Y 범위(캔들 + 지표 포함)
-      let yMin = Math.min(...lows), yMax = Math.max(...highs);
-      for(let i=0;i<N;i++){
-        if (ma[i]!=null){ yMin=Math.min(yMin,ma[i]); yMax=Math.max(yMax,ma[i]); }
-        if (bbU[i]!=null){ yMax=Math.max(yMax,bbU[i]); }
-        if (bbL[i]!=null){ yMin=Math.min(yMin,bbL[i]); }
-      }
-      if (!isFinite(yMin)||!isFinite(yMax)||yMin===yMax){ yMin-=1; yMax+=1; }
-
-      const {ticks} = niceTicks(yMin,yMax,6);
-      const plotX0=PAD.left, plotX1=W-PAD.right, plotY0=PAD.top, plotY1=H-PAD.bottom;
-
-      // 그리드/축
-      ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid')||'#1f2636';
-      ctx.lineWidth=1;
-      ticks.forEach(t=>{
-        const y = plotY1 - (t-yMin)/(yMax-yMin)*(plotY1-plotY0);
-        ctx.beginPath(); ctx.moveTo(plotX0,y); ctx.lineTo(plotX1,y); ctx.stroke();
-      });
-      ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axis')||'#273044';
-      ctx.beginPath(); ctx.moveTo(plotX0,plotY0); ctx.lineTo(plotX0,plotY1); ctx.lineTo(plotX1,plotY1); ctx.stroke();
-
-      // Y 라벨
-      ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--muted')||'#9aa4b2';
-      ctx.font="12px system-ui,sans-serif"; ctx.textAlign="right"; ctx.textBaseline="middle";
-      ticks.forEach(t=>{
-        const y = plotY1 - (t-yMin)/(yMax-yMin)*(plotY1-plotY0);
-        ctx.fillText(fmt(t), plotX0-6, y);
-      });
-
-      // X 라벨
-      const nLabels=8, step=Math.max(1,Math.floor(N/nLabels));
-      ctx.textAlign="center"; ctx.textBaseline="top";
-      for(let i=0;i<N;i+=step){
-        const x = plotX0 + (i+0.5)*(plotX1-plotX0)/N;
-        ctx.fillText(fmtDate(times[i]), x, plotY1+4);
-        ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid')||'#1f2636';
-        ctx.beginPath(); ctx.moveTo(x,plotY0); ctx.lineTo(x,plotY1); ctx.stroke();
-      }
-
-      const xOf=i=> plotX0 + (i+0.5)*(plotX1-plotX0)/N;
-      const yOf=v=> plotY1 - (v-yMin)/(yMax-yMin)*(plotY1-plotY0);
-
-      // 볼린저 채움
-      const bbfill=getComputedStyle(document.documentElement).getPropertyValue('--bbfill')||'rgba(155,89,182,.16)';
-      ctx.fillStyle=bbfill;
-      ctx.beginPath();
-      let started=false;
-      for(let i=0;i<N;i++){
-        if (bbU[i]==null){ started=false; continue; }
-        const x=xOf(i), y=yOf(bbU[i]);
-        if(!started){ ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y);
-      }
-      for(let i=N-1;i>=0;i--){
-        if (bbL[i]==null) continue;
-        ctx.lineTo(xOf(i), yOf(bbL[i]));
-      }
-      if (started){ ctx.closePath(); ctx.fill(); }
-
-      // 캔들
-      const up=getComputedStyle(document.documentElement).getPropertyValue('--up')||'#26a69a';
-      const dn=getComputedStyle(document.documentElement).getPropertyValue('--down')||'#ef5350';
-      const candleW = Math.max(2, Math.floor((plotX1-plotX0)/N*0.6));
-      ctx.lineWidth=1;
-      for(let i=0;i<N;i++){
-        const x=xOf(i);
-        // wick
-        ctx.strokeStyle = closes[i]>=opens[i]?up:dn;
-        ctx.beginPath(); ctx.moveTo(x, yOf(highs[i])); ctx.lineTo(x, yOf(lows[i])); ctx.stroke();
-        // body
-        const top = Math.min(yOf(opens[i]), yOf(closes[i]));
-        const bot = Math.max(yOf(opens[i]), yOf(closes[i]));
-        const h = Math.max(1, bot-top);
-        ctx.fillStyle = closes[i]>=opens[i]?up:dn;
-        ctx.fillRect(x - candleW/2, top, candleW, h);
-      }
-
-      // SMA(= 볼린저 중심선)
-      if (ma.some(v=>v!=null)){
-        ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--sma')||'#4ea1ff';
-        ctx.lineWidth=2; ctx.beginPath();
-        let s=false;
-        for(let i=0;i<N;i++){
-          const v=ma[i]; if(v==null){ s=false; continue; }
-          const x=xOf(i), y=yOf(v);
-          if(!s){ ctx.moveTo(x,y); s=true; } else ctx.lineTo(x,y);
-        }
-        ctx.stroke();
-      }
-
-      // 볼린저 상/하 라인
-      const bbColor=getComputedStyle(document.documentElement).getPropertyValue('--bb')||'#9b59b6';
-      const drawLine=(arr)=>{
-        ctx.strokeStyle=bbColor; ctx.lineWidth=1.5; ctx.beginPath();
-        let s=false;
-        for(let i=0;i<N;i++){
-          const v=arr[i]; if(v==null){ s=false; continue; }
-          const x=xOf(i), y=yOf(v);
-          if(!s){ ctx.moveTo(x,y); s=true; } else ctx.lineTo(x,y);
-        }
-        ctx.stroke();
+    function readConfig() {
+      const data = new FormData(form);
+      return {
+        startDate: data.get("startDate"),
+        endDate: data.get("endDate"),
+        initialCash: Number(data.get("initialCash")),
+        orderPct: Number(data.get("orderPct")) / 100,
+        smaPeriod: Number(data.get("smaPeriod")),
+        rsiPeriod: Number(data.get("rsiPeriod")),
+        buyBelowSma: Number(data.get("buyBelowSma")),
+        buyRsi: Number(data.get("buyRsi")),
+        sellAboveSma: Number(data.get("sellAboveSma")),
+        sellRsi: Number(data.get("sellRsi")),
+        takeProfit: Number(data.get("takeProfit")),
+        stopLoss: Number(data.get("stopLoss")),
+        feePct: Number(data.get("feePct")) / 100
       };
-      if (bbU.some(v=>v!=null)) drawLine(bbU);
-      if (bbL.some(v=>v!=null)) drawLine(bbL);
-
-      // 매매 마커
-      const r2=5;
-      for(const t of trades){
-        const i = rows.findIndex(r=>r.date===t.date);
-        if (i<0) continue;
-        const x=xOf(i), y=yOf(rows[i].close);
-        ctx.beginPath();
-        ctx.fillStyle = t.type==="BUY" ? (getComputedStyle(document.documentElement).getPropertyValue('--buy')||'#00c853')
-                                       : (getComputedStyle(document.documentElement).getPropertyValue('--sell')||'#ff5252');
-        ctx.arc(x, y, r2, 0, Math.PI*2); ctx.fill();
-      }
     }
 
-    // -------------------- 앱 구동 --------------------
-    let ALL = []; // 전체 CSV
-    (async function init(){
-      try{
-        ALL = await loadCSV("data/BTC_USDT.csv");
-        // 기본 날짜 범위 자동 채움
-        const startInput = document.querySelector('input[name="start_date"]');
-        const endInput   = document.querySelector('input[name="end_date"]');
-        startInput.value = ALL[0]?.date || "";
-        endInput.value   = ALL.at(-1)?.date || "";
-      } catch (e){
-        document.getElementById('result').textContent = "CSV 로드 실패: " + (e.message||e);
-      }
-    })();
-
-    document.getElementById("sim-form").addEventListener("submit", async (e)=>{
-      e.preventDefault();
-      if (!ALL.length){
-        document.getElementById('result').textContent = "데이터가 없습니다. CSV 경로를 확인하세요.";
+    function runBacktest() {
+      const config = readConfig();
+      const start = parseDate(config.startDate);
+      const end = parseDate(config.endDate);
+      const sliced = candles.filter((row) => {
+        const date = parseDate(row.date);
+        return date >= start && date <= end;
+      });
+      if (sliced.length < Math.max(config.smaPeriod, config.rsiPeriod) + 2) {
+        alert("선택한 기간이 조건 계산에 너무 짧습니다.");
         return;
       }
-      const form = e.currentTarget;
-      const balance = Number(form.balance.value);
-      const p  = Math.max(2, Number(form.ma_period.value));
-      const k  = Math.max(0.1, Number(form.bb_k.value));
-      const s  = form.start_date.value;
-      const t  = form.end_date.value;
-
-      // 구간 필터
-      const filtered = ALL.filter(r => r.date >= s && r.date <= t);
-      if (!filtered.length){
-        document.getElementById('result').textContent = "선택한 기간에 데이터가 없습니다.";
-        document.getElementById('trade-log').textContent = "";
-        drawChart(document.getElementById("chart"), [], [], [], [], []);
-        return;
-      }
-      const { ma, sd, bbU, bbL } = computeIndicators(filtered, p, k);
-      const { final, profit, trades } = simulate(filtered, balance, ma, sd, k);
-
-      // 결과
-      const resEl = document.getElementById('result');
-      resEl.innerHTML = `
-        최종 자산: <b>${final.toFixed(2)}</b> USDT &nbsp;|&nbsp;
-        수익: <b style="color:${profit>=0?'#4caf50':'#ff5252'}">${profit.toFixed(2)}</b> USDT
-        <br/><span class="pill">표본 개수: ${filtered.length.toLocaleString()}</span>
-        <span class="pill">SMA(${p}), BB(${p}, ${k})</span>
-      `;
-
-      // 거래 로그
-      const logDiv = document.getElementById('trade-log');
-      if (!trades.length){
-        logDiv.innerHTML = `<p>거래 내역이 없습니다.</p>`;
-      } else {
-        let html = `<table><thead><tr><th>날짜</th><th>종류</th><th>가격(USDT)</th></tr></thead><tbody>`;
-        for (const tr of trades){
-          html += `<tr>
-            <td>${tr.date}</td>
-            <td>${tr.type === 'BUY' ? '<span class="pill buy">BUY</span>' : '<span class="pill sell">SELL</span>'}</td>
-            <td>${tr.price.toFixed(2)}</td>
-          </tr>`;
+      let cash = config.initialCash;
+      let coin = 0;
+      let entryPrice = 0;
+      let wins = 0;
+      let closedTrades = 0;
+      let peak = config.initialCash;
+      let maxDrawdown = 0;
+      const trades = [];
+      const equity = [];
+      for (let i = 1; i < sliced.length; i += 1) {
+        const candle = sliced[i];
+        const price = candle.close;
+        const avg = sma(sliced, config.smaPeriod, i);
+        const currentRsi = rsi(sliced, config.rsiPeriod, i);
+        const value = cash + coin * price;
+        peak = Math.max(peak, value);
+        maxDrawdown = Math.min(maxDrawdown, ((value - peak) / peak) * 100);
+        if (!avg || currentRsi === null) {
+          equity.push({ date: candle.date, value });
+          continue;
         }
-        html += `</tbody></table>`;
-        logDiv.innerHTML = html;
+        const buyLine = avg * (1 - config.buyBelowSma / 100);
+        const sellLine = avg * (1 + config.sellAboveSma / 100);
+        if (coin <= 0) {
+          const shouldBuy = price <= buyLine || currentRsi <= config.buyRsi;
+          if (shouldBuy) {
+            const spend = cash * config.orderPct;
+            const netSpend = spend * (1 - config.feePct);
+            coin = netSpend / price;
+            cash -= spend;
+            entryPrice = price;
+            trades.push({ date: candle.date, side: "매수", price, volume: coin });
+          }
+        } else {
+          const pnlPct = ((price - entryPrice) / entryPrice) * 100;
+          const shouldSell = pnlPct >= config.takeProfit || pnlPct <= -config.stopLoss || price >= sellLine || currentRsi >= config.sellRsi;
+          if (shouldSell) {
+            const gross = coin * price;
+            const net = gross * (1 - config.feePct);
+            cash += net;
+            if (price > entryPrice) wins += 1;
+            closedTrades += 1;
+            trades.push({ date: candle.date, side: "매도", price, volume: coin });
+            coin = 0;
+            entryPrice = 0;
+          }
+        }
+        equity.push({ date: candle.date, value: cash + coin * price });
       }
+      const last = sliced[sliced.length - 1];
+      const finalValue = cash + coin * last.close;
+      const profit = finalValue - config.initialCash;
+      const strategyReturn = (profit / config.initialCash) * 100;
+      const marketReturn = ((last.close - sliced[0].close) / sliced[0].close) * 100;
+      const winRate = closedTrades > 0 ? (wins / closedTrades) * 100 : 0;
+      renderStats({ initialCash: config.initialCash, finalValue, profit, strategyReturn, marketReturn, maxDrawdown, winRate, tradeCount: trades.length, lastClose: last.close });
+      renderTrades(trades);
+      drawChart(sliced, equity, trades, config);
+    }
 
-      // 차트 그리기
-      drawChart(document.getElementById("chart"), filtered, ma, bbU, bbL, trades);
-    });
+    function renderStats(result) {
+      $("lastClose").textContent = fmtMoney(result.lastClose);
+      $("marketReturn").textContent = fmtPct(result.marketReturn);
+      $("marketReturn").className = result.marketReturn >= 0 ? "up" : "down";
+      $("strategyReturn").textContent = fmtPct(result.strategyReturn);
+      $("strategyReturn").className = result.strategyReturn >= 0 ? "up" : "down";
+      $("tradeCount").textContent = `${result.tradeCount}건`;
+      $("finalValue").textContent = fmtMoney(result.finalValue);
+      $("initialAsset").textContent = fmtMoney(result.initialCash);
+      $("profitLoss").textContent = fmtMoney(result.profit);
+      $("profitLoss").className = result.profit >= 0 ? "red" : "blue";
+      $("maxDrawdown").textContent = fmtPct(result.maxDrawdown);
+      $("maxDrawdown").className = "blue";
+      $("winRate").textContent = `${result.winRate.toFixed(1)}%`;
+    }
+
+    function renderTrades(trades) {
+      $("tradeSummary").textContent = `${trades.length}건`;
+      $("tradeRows").innerHTML = trades.slice().reverse().map((trade) => `<tr><td>${trade.date}</td><td class="${trade.side === "매수" ? "buy" : "sell"}">${trade.side}</td><td>${fmtMoney(trade.price)}</td><td>${trade.volume.toFixed(6)}</td></tr>`).join("");
+    }
+
+    function drawChart(data, equity, trades, config) {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = rect.width * ratio;
+      canvas.height = rect.height * ratio;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      const width = rect.width;
+      const height = rect.height;
+      const pad = { top: 22, right: 70, bottom: 42, left: 16 };
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+      const prices = data.flatMap((row) => [row.high, row.low]);
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      const y = (price) => pad.top + ((max - price) / (max - min)) * chartH;
+      const x = (index) => pad.left + (index / Math.max(data.length - 1, 1)) * chartW;
+      const candleW = Math.max(2, Math.min(10, chartW / data.length * 0.65));
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#0f141b";
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = "#1f2a38";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 5; i += 1) {
+        const gy = pad.top + (chartH / 5) * i;
+        ctx.beginPath(); ctx.moveTo(pad.left, gy); ctx.lineTo(width - pad.right + 8, gy); ctx.stroke();
+        const price = max - ((max - min) / 5) * i;
+        ctx.fillStyle = "#8b98a9"; ctx.font = "12px system-ui"; ctx.fillText(fmtMoney(price), width - pad.right + 12, gy + 4);
+      }
+      data.forEach((row, index) => {
+        const cx = x(index);
+        const rising = row.close >= row.open;
+        ctx.strokeStyle = rising ? "#f6465d" : "#0b74ff";
+        ctx.fillStyle = rising ? "#f6465d" : "#0b74ff";
+        ctx.beginPath(); ctx.moveTo(cx, y(row.high)); ctx.lineTo(cx, y(row.low)); ctx.stroke();
+        const top = y(Math.max(row.open, row.close));
+        const bottom = y(Math.min(row.open, row.close));
+        ctx.fillRect(cx - candleW / 2, top, candleW, Math.max(1, bottom - top));
+      });
+      ctx.strokeStyle = "#f0b90b"; ctx.lineWidth = 1.5; ctx.beginPath();
+      data.forEach((_, index) => {
+        const avg = sma(data, config.smaPeriod, index);
+        if (!avg) return;
+        const px = x(index); const py = y(avg);
+        if (index === config.smaPeriod - 1) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.stroke();
+      trades.forEach((trade) => {
+        const index = data.findIndex((row) => row.date === trade.date);
+        if (index < 0) return;
+        const px = x(index); const py = y(trade.price);
+        ctx.fillStyle = trade.side === "매수" ? "#f6465d" : "#0b74ff";
+        ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill();
+      });
+      if (equity.length > 1) {
+        const minEq = Math.min(...equity.map((row) => row.value));
+        const maxEq = Math.max(...equity.map((row) => row.value));
+        const eqY = (value) => pad.top + chartH - ((value - minEq) / Math.max(maxEq - minEq, 1)) * (chartH * 0.22);
+        ctx.strokeStyle = "#0ecb81"; ctx.lineWidth = 1.4; ctx.beginPath();
+        equity.forEach((row, index) => { const px = x(index); const py = eqY(row.value); if (index === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); });
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#8b98a9"; ctx.font = "12px system-ui"; ctx.fillText(data[0].date, pad.left, height - 16); ctx.fillText(data[data.length - 1].date, width - pad.right - 18, height - 16);
+      ctx.fillStyle = "#f0b90b"; ctx.fillText(`SMA ${config.smaPeriod}`, pad.left + 8, pad.top + 16);
+      ctx.fillStyle = "#0ecb81"; ctx.fillText("자산 곡선", pad.left + 76, pad.top + 16);
+    }
+
+    form.addEventListener("submit", (event) => { event.preventDefault(); runBacktest(); });
+    window.addEventListener("resize", () => { if (candles.length) runBacktest(); });
+    loadCandles().catch((error) => { console.error(error); alert("데이터를 불러오지 못했습니다. GitHub Pages 또는 로컬 서버에서 docs/index.html을 열어주세요."); });
   </script>
 </body>
 </html>

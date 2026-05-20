@@ -131,6 +131,15 @@
               <select name="endDay" aria-label="종료 일"></select>
             </div>
           </div>
+          <div class="field">
+            <label>전략 선택</label>
+            <select name="strategyPreset">
+              <option value="balanced" selected>균형형: 일반적인 자동매매</option>
+              <option value="conservative">보수형: 덜 사고 빨리 방어</option>
+              <option value="aggressive">공격형: 더 자주 진입</option>
+              <option value="custom">직접 설정</option>
+            </select>
+          </div>
           <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div>
           <div class="two"><div class="field"><label>SMA 기간</label><input type="number" name="smaPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div></div>
           <div class="two"><div class="field"><label>매수: SMA보다 낮음(%)</label><input type="number" name="buyBelowSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매수: RSI 이하</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
@@ -178,6 +187,11 @@
       return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     };
     const dateFromParts = (prefix) => `${form[`${prefix}Year`].value}-${form[`${prefix}Month`].value}-${form[`${prefix}Day`].value}`;
+    const strategyPresets = {
+      conservative: { orderPct: 50, smaPeriod: 30, rsiPeriod: 14, buyBelowSma: 2.0, buyRsi: 25, sellAboveSma: 0.8, sellRsi: 62, takeProfit: 2.0, stopLoss: 1.2 },
+      balanced: { orderPct: 75, smaPeriod: 20, rsiPeriod: 14, buyBelowSma: 1.0, buyRsi: 30, sellAboveSma: 1.0, sellRsi: 70, takeProfit: 3.0, stopLoss: 2.0 },
+      aggressive: { orderPct: 100, smaPeriod: 12, rsiPeriod: 10, buyBelowSma: 0.3, buyRsi: 38, sellAboveSma: 1.8, sellRsi: 78, takeProfit: 5.0, stopLoss: 3.0 }
+    };
     const selectedDateRange = () => {
       const fallback = formatDateInput(todayKst());
       return {
@@ -534,6 +548,15 @@
       setSelectDate("end", endDate);
     }
 
+    function applyStrategyPreset(name) {
+      const preset = strategyPresets[name];
+      if (!preset) return;
+      Object.entries(preset).forEach(([key, value]) => {
+        if (form[key]) form[key].value = value;
+      });
+      runBacktest();
+    }
+
     function panChart(clientX) {
       if (!lastChartData || lastChartData.length <= chartViewSize) return;
       const delta = clientX - dragStartX;
@@ -546,6 +569,13 @@
     form.addEventListener("submit", (event) => { event.preventDefault(); runBacktest(); });
     form.market.addEventListener("change", () => loadCandles());
     form.interval.addEventListener("change", () => loadCandles());
+    form.strategyPreset.addEventListener("change", () => applyStrategyPreset(form.strategyPreset.value));
+    ["orderPct", "smaPeriod", "rsiPeriod", "buyBelowSma", "buyRsi", "sellAboveSma", "sellRsi", "takeProfit", "stopLoss", "feePct"].forEach((name) => {
+      form[name].addEventListener("change", () => {
+        form.strategyPreset.value = "custom";
+        runBacktest();
+      });
+    });
     ["startYear", "startMonth", "startDay", "endYear", "endMonth", "endDay"].forEach((name) => {
       form[name].addEventListener("change", () => {
         runBacktest();

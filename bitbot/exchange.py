@@ -50,11 +50,17 @@ class UpbitExchangeClient(ExchangeClient):
 
     def get_position(self, symbol: str) -> Position | None:
         base_asset = symbol.split("-")[-1]
-        balance = self.client.get_balance(base_asset)
-        if balance is None or float(balance) <= 0:
-            return None
-        price = self.get_current_price(symbol)
-        return Position(symbol=symbol, volume=float(balance), entry_price=price)
+        balances = self.client.get_balances()
+        for balance in balances:
+            if balance.get("currency") != base_asset:
+                continue
+            volume = float(balance.get("balance") or 0)
+            if volume <= 0:
+                return None
+            avg_buy_price = float(balance.get("avg_buy_price") or 0)
+            entry_price = avg_buy_price if avg_buy_price > 0 else self.get_current_price(symbol)
+            return Position(symbol=symbol, volume=volume, entry_price=entry_price)
+        return None
 
     def buy_market(self, symbol: str, amount: float):
         return self.client.buy_market_order(symbol, amount)
@@ -99,7 +105,7 @@ class PaperExchangeClient(ExchangeClient):
             current.entry_price = total_cost / total_volume
         else:
             self.positions[symbol] = Position(symbol=symbol, volume=volume, entry_price=price)
-        return {"mode": "paper", "side": "buy", "symbol": symbol, "price": price, "volume": volume}
+        return {"mode": "paper", "side": "buy", "symbol": symbol, "price": price, "volume": volume, "cash": self.cash}
 
     def sell_market(self, symbol: str, volume: float):
         current = self.positions.get(symbol)
@@ -111,4 +117,4 @@ class PaperExchangeClient(ExchangeClient):
         current.volume -= sell_volume
         if current.volume <= 0:
             del self.positions[symbol]
-        return {"mode": "paper", "side": "sell", "symbol": symbol, "price": price, "volume": sell_volume}
+        return {"mode": "paper", "side": "sell", "symbol": symbol, "price": price, "volume": sell_volume, "cash": self.cash}

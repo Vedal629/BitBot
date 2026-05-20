@@ -60,9 +60,6 @@
     .date-selects { display: grid; grid-template-columns: 1.2fr 0.9fr 0.9fr; gap: 6px; }
     .date-selects select { width: 100%; height: 38px; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 4px; padding: 0 8px; outline: none; }
     .date-selects select:focus { border-color: var(--blue-2); }
-    .quick-ranges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
-    .quick-ranges button { height: 34px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); color: var(--muted); cursor: pointer; font-weight: 700; font-size: 12px; }
-    .quick-ranges button:hover, .quick-ranges button.active { border-color: var(--blue-2); color: #fff; }
     .submit { width: 100%; height: 46px; border: none; border-radius: 4px; background: var(--blue); color: white; cursor: pointer; font-weight: 800; margin-top: 6px; }
     .submit:hover { background: var(--blue-2); }
     .hint { color: var(--muted); font-size: 12px; line-height: 1.6; margin-top: 12px; }
@@ -72,7 +69,7 @@
     .buy { color: var(--red); }
     .sell { color: var(--blue-2); }
     @media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } .ticker-strip, .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .chart-wrap { height: 430px; } }
-    @media (max-width: 620px) { .topbar { height: auto; padding: 12px; } .ticker-strip, .result-grid, .two { grid-template-columns: 1fr; } .chart-wrap { height: 360px; } .quick-ranges { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) { .topbar { height: auto; padding: 12px; } .ticker-strip, .result-grid, .two { grid-template-columns: 1fr; } .chart-wrap { height: 360px; } }
   </style>
 </head>
 <body>
@@ -118,12 +115,6 @@
             <div class="field"><label>차트 간격</label><select name="interval"><option value="days" selected>일봉</option><option value="60">1시간</option><option value="15">15분</option><option value="5">5분</option><option value="1">1분</option></select></div>
             <div class="field"><label>초기 자산</label><input type="number" name="initialCash" min="100" step="100" value="10000" required /></div>
           </div>
-          <div class="quick-ranges" id="quickRanges">
-            <button type="button" data-days="30">1개월</button>
-            <button type="button" data-days="90">3개월</button>
-            <button type="button" data-days="365" class="active">1년</button>
-            <button type="button" data-days="all">전체</button>
-          </div>
           <div class="date-field">
             <label>시작일</label>
             <div class="date-selects">
@@ -154,7 +145,6 @@
   </div>
   <script>
     const form = document.querySelector("#backtestForm");
-    const quickRanges = document.querySelector("#quickRanges");
     const canvas = document.querySelector("#chart");
     const ctx = canvas.getContext("2d");
     let candles = [];
@@ -188,7 +178,6 @@
       return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     };
     const dateFromParts = (prefix) => `${form[`${prefix}Year`].value}-${form[`${prefix}Month`].value}-${form[`${prefix}Day`].value}`;
-    const selectedRangeDays = () => quickRanges.querySelector(".active")?.dataset.days || "365";
     const selectedDateRange = () => {
       const fallback = formatDateInput(todayKst());
       return {
@@ -221,7 +210,7 @@
         fillSelect(form[`${prefix}Month`], Array.from({ length: 12 }, (_, index) => index + 1), "월");
         fillSelect(form[`${prefix}Day`], Array.from({ length: 31 }, (_, index) => index + 1), "일");
       });
-      setDateRange("365");
+      setDefaultDateRange();
     }
 
     async function fetchJson(url) {
@@ -534,21 +523,15 @@
       refreshTimer = setInterval(() => loadCandles({ keepDates: true, silent: true }), 30000);
     }
 
-    function setDateRange(days) {
+    function setDefaultDateRange() {
       if (!form.startYear.options.length || !form.endYear.options.length) return;
       const end = todayKst();
       const endDate = formatDateInput(end);
-      let startDate = candles[0]?.date.slice(0, 10) || endDate;
-      if (days !== "all") {
-        const start = new Date(end);
-        start.setDate(start.getDate() - Number(days) + 1);
-        startDate = formatDateInput(start);
-      }
+      const start = new Date(end);
+      start.setFullYear(start.getFullYear() - 1);
+      const startDate = formatDateInput(start);
       setSelectDate("start", startDate);
       setSelectDate("end", endDate);
-      quickRanges.querySelectorAll("button").forEach((button) => {
-        button.classList.toggle("active", button.dataset.days === String(days));
-      });
     }
 
     function panChart(clientX) {
@@ -565,15 +548,8 @@
     form.interval.addEventListener("change", () => loadCandles());
     ["startYear", "startMonth", "startDay", "endYear", "endMonth", "endDay"].forEach((name) => {
       form[name].addEventListener("change", () => {
-        quickRanges.querySelectorAll("button").forEach((button) => button.classList.remove("active"));
         runBacktest();
       });
-    });
-    quickRanges.addEventListener("click", (event) => {
-      const button = event.target.closest("button[data-days]");
-      if (!button) return;
-      setDateRange(button.dataset.days);
-      runBacktest();
     });
     canvas.addEventListener("pointerdown", (event) => {
       if (!lastChartData || lastChartData.length <= chartViewSize) return;

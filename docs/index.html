@@ -55,6 +55,11 @@
     .field input, .field select { width: 100%; height: 38px; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 4px; padding: 0 10px; outline: none; }
     .field input:focus, .field select:focus { border-color: var(--blue-2); }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .date-field { display: grid; gap: 6px; margin-bottom: 12px; }
+    .date-field label { color: var(--muted); font-size: 12px; }
+    .date-selects { display: grid; grid-template-columns: 1.2fr 0.9fr 0.9fr; gap: 6px; }
+    .date-selects select { width: 100%; height: 38px; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 4px; padding: 0 8px; outline: none; }
+    .date-selects select:focus { border-color: var(--blue-2); }
     .quick-ranges { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px; }
     .quick-ranges button { height: 34px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); color: var(--muted); cursor: pointer; font-weight: 700; font-size: 12px; }
     .quick-ranges button:hover, .quick-ranges button.active { border-color: var(--blue-2); color: #fff; }
@@ -119,6 +124,22 @@
             <button type="button" data-days="365" class="active">1년</button>
             <button type="button" data-days="all">전체</button>
           </div>
+          <div class="date-field">
+            <label>시작일</label>
+            <div class="date-selects">
+              <select name="startYear" aria-label="시작 연도"></select>
+              <select name="startMonth" aria-label="시작 월"></select>
+              <select name="startDay" aria-label="시작 일"></select>
+            </div>
+          </div>
+          <div class="date-field">
+            <label>종료일</label>
+            <div class="date-selects">
+              <select name="endYear" aria-label="종료 연도"></select>
+              <select name="endMonth" aria-label="종료 월"></select>
+              <select name="endDay" aria-label="종료 일"></select>
+            </div>
+          </div>
           <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div>
           <div class="two"><div class="field"><label>SMA 기간</label><input type="number" name="smaPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div></div>
           <div class="two"><div class="field"><label>매수: SMA보다 낮음(%)</label><input type="number" name="buyBelowSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매수: RSI 이하</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
@@ -166,17 +187,42 @@
       const now = new Date();
       return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     };
+    const dateFromParts = (prefix) => `${form[`${prefix}Year`].value}-${form[`${prefix}Month`].value}-${form[`${prefix}Day`].value}`;
     const selectedRangeDays = () => quickRanges.querySelector(".active")?.dataset.days || "365";
     const selectedDateRange = () => {
-      if (!candles.length) return { startDate: formatDateInput(todayKst()), endDate: formatDateInput(todayKst()) };
-      const days = selectedRangeDays();
-      const end = todayKst();
-      const endDate = formatDateInput(end);
-      if (days === "all") return { startDate: candles[0].date.slice(0, 10), endDate };
-      const start = new Date(end);
-      start.setDate(start.getDate() - Number(days) + 1);
-      return { startDate: formatDateInput(start), endDate };
+      const fallback = formatDateInput(todayKst());
+      return {
+        startDate: form.startYear.value ? dateFromParts("start") : fallback,
+        endDate: form.endYear.value ? dateFromParts("end") : fallback
+      };
     };
+
+    function fillSelect(select, values, suffix = "") {
+      select.innerHTML = values.map((value) => {
+        const padded = String(value).padStart(2, "0");
+        return `<option value="${padded}">${value}${suffix}</option>`;
+      }).join("");
+    }
+
+    function setSelectDate(prefix, dateValue) {
+      const date = parseDate(dateValue);
+      form[`${prefix}Year`].value = String(date.getFullYear());
+      form[`${prefix}Month`].value = String(date.getMonth() + 1).padStart(2, "0");
+      form[`${prefix}Day`].value = String(date.getDate()).padStart(2, "0");
+    }
+
+    function setupDateSelects() {
+      const currentYear = todayKst().getFullYear();
+      const oldestYear = candles.length ? parseDate(candles[0].date).getFullYear() : currentYear - 5;
+      const years = [];
+      for (let year = currentYear; year >= oldestYear; year -= 1) years.push(year);
+      ["start", "end"].forEach((prefix) => {
+        fillSelect(form[`${prefix}Year`], years, "년");
+        fillSelect(form[`${prefix}Month`], Array.from({ length: 12 }, (_, index) => index + 1), "월");
+        fillSelect(form[`${prefix}Day`], Array.from({ length: 31 }, (_, index) => index + 1), "일");
+      });
+      setDateRange("365");
+    }
 
     async function fetchJson(url) {
       const urls = [
@@ -242,6 +288,7 @@
         return;
       }
       if (!candles.length) throw new Error("표시할 캔들 데이터가 없습니다.");
+      if (!options.keepDates) setupDateSelects();
       $("lastUpdated").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
       runBacktest();
     }
@@ -488,6 +535,17 @@
     }
 
     function setDateRange(days) {
+      if (!form.startYear.options.length || !form.endYear.options.length) return;
+      const end = todayKst();
+      const endDate = formatDateInput(end);
+      let startDate = candles[0]?.date.slice(0, 10) || endDate;
+      if (days !== "all") {
+        const start = new Date(end);
+        start.setDate(start.getDate() - Number(days) + 1);
+        startDate = formatDateInput(start);
+      }
+      setSelectDate("start", startDate);
+      setSelectDate("end", endDate);
       quickRanges.querySelectorAll("button").forEach((button) => {
         button.classList.toggle("active", button.dataset.days === String(days));
       });
@@ -505,6 +563,12 @@
     form.addEventListener("submit", (event) => { event.preventDefault(); runBacktest(); });
     form.market.addEventListener("change", () => loadCandles());
     form.interval.addEventListener("change", () => loadCandles());
+    ["startYear", "startMonth", "startDay", "endYear", "endMonth", "endDay"].forEach((name) => {
+      form[name].addEventListener("change", () => {
+        quickRanges.querySelectorAll("button").forEach((button) => button.classList.remove("active"));
+        runBacktest();
+      });
+    });
     quickRanges.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-days]");
       if (!button) return;

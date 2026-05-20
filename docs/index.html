@@ -110,16 +110,15 @@
             </select>
           </div>
           <div class="two">
-            <div class="field"><label>차트 간격</label><select name="interval"><option value="1">1분</option><option value="5">5분</option><option value="15">15분</option><option value="60">1시간</option><option value="days">일봉</option></select></div>
+            <div class="field"><label>차트 간격</label><select name="interval"><option value="days" selected>일봉</option><option value="60">1시간</option><option value="15">15분</option><option value="5">5분</option><option value="1">1분</option></select></div>
             <div class="field"><label>초기 자산</label><input type="number" name="initialCash" min="100" step="100" value="10000" required /></div>
           </div>
           <div class="quick-ranges" id="quickRanges">
-            <button type="button" data-days="1">1일</button>
-            <button type="button" data-days="7">7일</button>
-            <button type="button" data-days="30" class="active">30일</button>
+            <button type="button" data-days="30">1개월</button>
+            <button type="button" data-days="90">3개월</button>
+            <button type="button" data-days="365" class="active">1년</button>
             <button type="button" data-days="all">전체</button>
           </div>
-          <div class="two"><div class="field"><label>시작일</label><input type="date" name="startDate" required /></div><div class="field"><label>종료일</label><input type="date" name="endDate" required /></div></div>
           <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div>
           <div class="two"><div class="field"><label>SMA 기간</label><input type="number" name="smaPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div></div>
           <div class="two"><div class="field"><label>매수: SMA보다 낮음(%)</label><input type="number" name="buyBelowSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매수: RSI 이하</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
@@ -162,6 +161,21 @@
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
+    };
+    const todayKst = () => {
+      const now = new Date();
+      return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    };
+    const selectedRangeDays = () => quickRanges.querySelector(".active")?.dataset.days || "365";
+    const selectedDateRange = () => {
+      if (!candles.length) return { startDate: formatDateInput(todayKst()), endDate: formatDateInput(todayKst()) };
+      const days = selectedRangeDays();
+      const end = todayKst();
+      const endDate = formatDateInput(end);
+      if (days === "all") return { startDate: candles[0].date.slice(0, 10), endDate };
+      const start = new Date(end);
+      start.setDate(start.getDate() - Number(days) + 1);
+      return { startDate: formatDateInput(start), endDate };
     };
 
     async function fetchJson(url) {
@@ -210,6 +224,7 @@
     async function loadCandles(options = {}) {
       const config = readConfig();
       if (!options.silent) $("dataStatus").textContent = `${config.market} 실시간 캔들 데이터를 불러오는 중입니다.`;
+      if (!candles.length) drawMessage("시세 데이터를 불러오는 중입니다.");
       try {
         candles = await fetchUpbitCandles(config.market, config.interval);
         $("marketName").textContent = config.market;
@@ -223,13 +238,10 @@
           return;
         }
         $("dataStatus").textContent = "시세 연결을 재시도하는 중입니다.";
+        drawMessage("시세 연결을 재시도하는 중입니다.");
         return;
       }
       if (!candles.length) throw new Error("표시할 캔들 데이터가 없습니다.");
-      if (!options.keepDates) {
-        setDateRange(30);
-        form.endDate.value = candles[candles.length - 1].date.slice(0, 10);
-      }
       $("lastUpdated").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
       runBacktest();
     }
@@ -260,8 +272,7 @@
       return {
         market: data.get("market"),
         interval: data.get("interval"),
-        startDate: data.get("startDate"),
-        endDate: data.get("endDate"),
+        ...selectedDateRange(),
         initialCash: Number(data.get("initialCash")),
         orderPct: Number(data.get("orderPct")) / 100,
         smaPeriod: Number(data.get("smaPeriod")),
@@ -288,6 +299,7 @@
       });
       if (sliced.length < Math.max(config.smaPeriod, config.rsiPeriod) + 2) {
         $("dataStatus").textContent = "선택한 기간이 조건 계산에 너무 짧습니다.";
+        drawMessage("선택한 기간이 너무 짧습니다.");
         return;
       }
       let cash = config.initialCash;
@@ -455,22 +467,27 @@
       }
     }
 
+    function drawMessage(message) {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(rect.width, 1) * ratio;
+      canvas.height = Math.max(rect.height, 1) * ratio;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.fillStyle = "#0f141b";
+      ctx.fillRect(0, 0, rect.width, rect.height);
+      ctx.fillStyle = "#8b98a9";
+      ctx.font = "14px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(message, rect.width / 2, rect.height / 2);
+      ctx.textAlign = "left";
+    }
+
     function startLiveRefresh() {
       if (refreshTimer) clearInterval(refreshTimer);
       refreshTimer = setInterval(() => loadCandles({ keepDates: true, silent: true }), 30000);
     }
 
     function setDateRange(days) {
-      if (!candles.length) return;
-      const lastDate = candles[candles.length - 1].date.slice(0, 10);
-      form.endDate.value = lastDate;
-      if (days === "all") {
-        form.startDate.value = candles[0].date.slice(0, 10);
-      } else {
-        const end = parseDate(lastDate);
-        end.setDate(end.getDate() - Number(days) + 1);
-        form.startDate.value = formatDateInput(end);
-      }
       quickRanges.querySelectorAll("button").forEach((button) => {
         button.classList.toggle("active", button.dataset.days === String(days));
       });
@@ -494,8 +511,6 @@
       setDateRange(button.dataset.days);
       runBacktest();
     });
-    form.startDate.addEventListener("change", runBacktest);
-    form.endDate.addEventListener("change", runBacktest);
     canvas.addEventListener("pointerdown", (event) => {
       if (!lastChartData || lastChartData.length <= chartViewSize) return;
       isDraggingChart = true;

@@ -14,6 +14,7 @@ class TradingGUI(tk.Tk):
         super().__init__()
         load_dotenv()
         self.title("BitBot Auto Trader")
+        self.paper_exchange = PaperExchangeClient()
         self.runner: TradingRunner | None = None
         self._create_widgets()
         self._layout_widgets()
@@ -106,7 +107,7 @@ class TradingGUI(tk.Tk):
                 raise RuntimeError("Live trading cancelled.")
             exchange = UpbitExchangeClient()
         else:
-            exchange = PaperExchangeClient()
+            exchange = self.paper_exchange
         return TradingRunner(exchange=exchange, strategy=StrategyEngine(), log=self.log)
 
     def start_trading(self):

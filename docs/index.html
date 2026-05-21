@@ -46,6 +46,17 @@
     .result-card strong { font-size: 22px; color: #fff; }
     .result-card .red { color: var(--red); }
     .result-card .blue { color: var(--blue-2); }
+    .history-panel { background: var(--panel); border-top: 1px solid var(--line); padding: 16px; }
+    .history-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .history-title { font-size: 15px; font-weight: 800; }
+    .history-count { color: var(--muted); font-size: 12px; }
+    .history-table-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--input); }
+    .history-table { width: 100%; border-collapse: collapse; min-width: 620px; }
+    .history-table th, .history-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 12px; text-align: right; white-space: nowrap; }
+    .history-table th { color: var(--muted); background: #101722; font-weight: 700; }
+    .history-table th:first-child, .history-table td:first-child { text-align: left; }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-empty { color: var(--muted); font-size: 13px; padding: 18px; text-align: center; }
     .side { background: var(--panel); }
     .form-panel { background: var(--panel); padding: 16px; border-bottom: 1px solid var(--line); }
     .form-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; font-weight: 800; }
@@ -103,6 +114,10 @@
         <div class="result-card"><span>총 손익</span><strong id="profitLoss">-</strong></div>
         <div class="result-card"><span>최대 낙폭</span><strong id="maxDrawdown">-</strong></div>
         <div class="result-card"><span>승률</span><strong id="winRate">-</strong></div>
+      </section>
+      <section class="history-panel">
+        <div class="history-head"><div class="history-title">거래 내역</div><div class="history-count" id="tradeHistoryCount">-</div></div>
+        <div class="history-table-wrap" id="tradeHistory"></div>
       </section>
     </main>
     <aside class="side">
@@ -187,6 +202,7 @@
     const $ = (id) => document.getElementById(id);
     const fmtMoney = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
     const fmtPct = (value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+    const fmtVolume = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 8 });
     const parseDate = (value) => {
       if (value.includes("T")) return new Date(`${value}+09:00`);
       if (value.includes(" ")) return new Date(`${value.replace(" ", "T")}+09:00`);
@@ -491,6 +507,7 @@
       if (sliced.length < Math.max(config.rsiPeriod, config.bbPeriod, config.volumePeriod, 50) + 2) {
         $("dataStatus").textContent = "선택한 기간이 조건 계산에 너무 짧습니다.";
         drawMessage("선택한 기간이 너무 짧습니다.");
+        renderTradeHistory([]);
         return;
       }
       let cash = config.initialCash;
@@ -535,7 +552,7 @@
             cash -= spend;
             entryPrice = price;
             highestPrice = price;
-            trades.push({ date: candle.date, side: "매수", price, volume: coin });
+            trades.push({ date: candle.date, side: "매수", price, volume: coin, amount: spend, entryPrice: price, pnlPct: null });
           }
         } else {
           highestPrice = Math.max(highestPrice, price);
@@ -560,7 +577,7 @@
             cash += net;
             if (price > entryPrice) wins += 1;
             closedTrades += 1;
-            trades.push({ date: candle.date, side: "매도", price, volume: coin });
+            trades.push({ date: candle.date, side: "매도", price, volume: coin, amount: gross, entryPrice, pnlPct });
             coin = 0;
             entryPrice = 0;
             highestPrice = 0;
@@ -582,6 +599,7 @@
       chartViewSize = Math.min(90, sliced.length);
       chartViewStart = Math.max(0, sliced.length - chartViewSize);
       drawChart(sliced, equity, trades, config);
+      renderTradeHistory(trades);
     }
 
     function renderStats(result) {
@@ -598,6 +616,32 @@
       $("maxDrawdown").textContent = fmtPct(result.maxDrawdown);
       $("maxDrawdown").className = "blue";
       $("winRate").textContent = `${result.winRate.toFixed(1)}%`;
+    }
+
+    function renderTradeHistory(trades) {
+      $("tradeHistoryCount").textContent = trades.length ? `${trades.length}건` : "거래 없음";
+      if (!trades.length) {
+        $("tradeHistory").innerHTML = `<div class="history-empty">선택한 조건으로 발생한 매수/매도 내역이 없습니다.</div>`;
+        return;
+      }
+      const rows = trades.map((trade, index) => {
+        const pnl = trade.pnlPct === null ? "-" : `<span class="${trade.pnlPct >= 0 ? "buy" : "sell"}">${fmtPct(trade.pnlPct)}</span>`;
+        const entry = trade.side === "매도" ? fmtMoney(trade.entryPrice) : "-";
+        return `<tr>
+          <td>${index + 1}</td>
+          <td>${trade.date}</td>
+          <td class="${trade.side === "매수" ? "buy" : "sell"}">${trade.side}</td>
+          <td>${fmtMoney(trade.price)}</td>
+          <td>${entry}</td>
+          <td>${fmtVolume(trade.volume)}</td>
+          <td>${fmtMoney(trade.amount)}</td>
+          <td>${pnl}</td>
+        </tr>`;
+      }).join("");
+      $("tradeHistory").innerHTML = `<table class="history-table">
+        <thead><tr><th>No.</th><th>일시</th><th>구분</th><th>체결가</th><th>매수가</th><th>수량</th><th>금액</th><th>손익률</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
     }
 
     function drawChart(data, equity, trades, config) {

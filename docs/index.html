@@ -169,6 +169,11 @@
     let isDraggingChart = false;
     let refreshTimer = null;
     let lastSuccessfulLoad = null;
+    let candleSetKey = "";
+    const CACHE_TTL_MS = 10 * 60 * 1000;
+    const DIRECT_FETCH_TIMEOUT_MS = 2500;
+    const FALLBACK_FETCH_TIMEOUT_MS = 4500;
+    const cacheKey = (market, interval) => `bitbot:candles:${market}:${interval}`;
     const $ = (id) => document.getElementById(id);
     const fmtMoney = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
     const fmtPct = (value) => `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
@@ -229,36 +234,68 @@
     }
 
     async function fetchJson(url) {
-      const urls = [
-        url,
+      const fallbackUrls = [
         `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
         `https://corsproxy.io/?${encodeURIComponent(url)}`
       ];
-      let lastError = null;
-      for (const nextUrl of urls) {
+      const request = async (nextUrl, timeoutMs) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
-          const response = await fetch(nextUrl, { cache: "no-store" });
+          const response = await fetch(nextUrl, { cache: "no-store", signal: controller.signal });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           return await response.json();
-        } catch (error) {
-          lastError = error;
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      try {
+        return await request(url, DIRECT_FETCH_TIMEOUT_MS);
+      } catch (directError) {
+        try {
+          return await Promise.any(fallbackUrls.map((nextUrl) => request(nextUrl, FALLBACK_FETCH_TIMEOUT_MS)));
+        } catch {
+          throw directError || new Error("데이터 요청에 실패했습니다.");
         }
       }
-      throw lastError || new Error("데이터 요청에 실패했습니다.");
     }
 
-    async function fetchUpbitCandles(market, interval) {
+    function readCachedCandles(market, interval) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(cacheKey(market, interval)) || "null");
+        if (!cached || !Array.isArray(cached.rows)) return null;
+        if (Date.now() - cached.savedAt > CACHE_TTL_MS) return null;
+        return cached.rows;
+      } catch {
+        return null;
+      }
+    }
+
+    function writeCachedCandles(market, interval, rows) {
+      try {
+        localStorage.setItem(cacheKey(market, interval), JSON.stringify({ savedAt: Date.now(), rows }));
+      } catch {
+        // 저장 공간이 부족해도 실시간 표시 자체는 계속 동작해야 합니다.
+      }
+    }
+
+    function mergeCandles(previous, next) {
+      const merged = new Map();
+      [...previous, ...next].forEach((row) => merged.set(row.date, row));
+      return Array.from(merged.values()).sort((a, b) => parseDate(a.date) - parseDate(b.date));
+    }
+
+    async function fetchUpbitCandles(market, interval, pageCount = interval === "days" ? 2 : 3) {
       const path = interval === "days" ? "days" : `minutes/${interval}`;
       let to = "";
       const pages = [];
-      for (let page = 0; page < 3; page += 1) {
+      for (let page = 0; page < pageCount; page += 1) {
         const params = new URLSearchParams({ market, count: "200" });
         if (to) params.set("to", to);
         const rows = await fetchJson(`https://api.upbit.com/v1/candles/${path}?${params.toString()}`);
         if (!Array.isArray(rows) || rows.length === 0) break;
         pages.push(...rows);
         to = rows[rows.length - 1].candle_date_time_utc;
-        await new Promise((resolve) => setTimeout(resolve, 120));
       }
       const uniqueRows = Array.from(new Map(pages.map((row) => [row.timestamp, row])).values());
       return uniqueRows.reverse().map((row) => ({
@@ -273,10 +310,31 @@
 
     async function loadCandles(options = {}) {
       const config = readConfig();
+      const nextCacheKey = cacheKey(config.market, config.interval);
+      if (candleSetKey && candleSetKey !== nextCacheKey) {
+        candles = [];
+        lastChartData = null;
+        lastChartEquity = null;
+        lastChartTrades = null;
+        lastChartConfig = null;
+      }
       if (!options.silent) $("dataStatus").textContent = `${config.market} 실시간 캔들 데이터를 불러오는 중입니다.`;
-      if (!candles.length) drawMessage("시세 데이터를 불러오는 중입니다.");
+      const cached = readCachedCandles(config.market, config.interval);
+      if (!candles.length && cached?.length) {
+        candles = cached;
+        candleSetKey = nextCacheKey;
+        $("marketName").textContent = config.market;
+        $("dataStatus").textContent = `${config.market} 저장된 시세를 먼저 표시하고 최신 데이터를 확인 중입니다.`;
+        if (!options.keepDates) setupDateSelects();
+        runBacktest();
+      } else if (!candles.length) {
+        drawMessage("시세 데이터를 불러오는 중입니다.");
+      }
       try {
-        candles = await fetchUpbitCandles(config.market, config.interval);
+        const fresh = await fetchUpbitCandles(config.market, config.interval, options.quick ? 1 : undefined);
+        candles = options.quick && candles.length ? mergeCandles(candles, fresh) : fresh;
+        candleSetKey = nextCacheKey;
+        writeCachedCandles(config.market, config.interval, candles);
         $("marketName").textContent = config.market;
         $("dataStatus").textContent = `${config.market} ${config.interval === "days" ? "일봉" : `${config.interval}분봉`} 실시간 차트입니다.`;
         lastSuccessfulLoad = new Date();
@@ -593,7 +651,7 @@
 
     function startLiveRefresh() {
       if (refreshTimer) clearInterval(refreshTimer);
-      refreshTimer = setInterval(() => loadCandles({ keepDates: true, silent: true }), 30000);
+      refreshTimer = setInterval(() => loadCandles({ keepDates: true, silent: true, quick: true }), 60000);
     }
 
     function setDefaultDateRange() {

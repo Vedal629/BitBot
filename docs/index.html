@@ -54,6 +54,12 @@
     .field label { color: var(--muted); font-size: 12px; }
     .field input, .field select { width: 100%; height: 38px; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 4px; padding: 0 10px; outline: none; }
     .field input:focus, .field select:focus { border-color: var(--blue-2); }
+    .section-label { color: #fff; font-size: 13px; font-weight: 800; margin: 16px 0 10px; }
+    .condition { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); background: var(--input); border-radius: 4px; margin-bottom: 8px; }
+    .condition-head { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; font-weight: 700; }
+    .condition-head input { width: 16px; height: 16px; accent-color: var(--blue-2); }
+    .condition .field { margin-bottom: 0; }
+    .condition input:disabled, .condition select:disabled { opacity: 0.45; cursor: not-allowed; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .date-field { display: grid; gap: 6px; margin-bottom: 12px; }
     .date-field label { color: var(--muted); font-size: 12px; }
@@ -140,12 +146,21 @@
               <option value="custom">직접 설정</option>
             </select>
           </div>
-          <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div>
-          <div class="two"><div class="field"><label>SMA 기간</label><input type="number" name="smaPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div></div>
+          <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="75" required /></div>
+          <div class="two"><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div><div class="field"><label>거래량 평균 기간</label><input type="number" name="volumePeriod" min="2" max="200" step="1" value="20" required /></div></div>
           <div class="two"><div class="field"><label>볼린저 기간</label><input type="number" name="bbPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>볼린저 배수</label><input type="number" name="bbMultiplier" min="0.5" max="5" step="0.1" value="2" required /></div></div>
-          <div class="two"><div class="field"><label>매수: SMA보다 낮음(%)</label><input type="number" name="buyBelowSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매수: RSI 이하</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
-          <div class="two"><div class="field"><label>매도: SMA보다 높음(%)</label><input type="number" name="sellAboveSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매도: RSI 이상</label><input type="number" name="sellRsi" min="1" max="100" step="0.1" value="70" required /></div></div>
-          <div class="two"><div class="field"><label>익절(%)</label><input type="number" name="takeProfit" min="0.1" max="100" step="0.1" value="3" required /></div><div class="field"><label>손절(%)</label><input type="number" name="stopLoss" min="0.1" max="100" step="0.1" value="2" required /></div></div>
+          <div class="section-label">매수 조건</div>
+          <div class="two"><div class="field"><label>매수 조합</label><select name="buyMode"><option value="any" selected>하나라도 만족</option><option value="all">모두 만족</option></select></div><div class="field"><label>매도 조합</label><select name="sellMode"><option value="any" selected>하나라도 만족</option><option value="all">모두 만족</option></select></div></div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseRsi" checked />RSI 이하 매수</label><div class="field"><label>RSI 기준</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseMaCross" checked />MA15가 MA50을 상향 돌파</label></div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseBbLower" checked />볼린저밴드 하단 이하 매수</label></div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseVolumeSpike" />거래량 급증 매수</label><div class="field"><label>평균 거래량 대비 배수</label><input type="number" name="buyVolumeMultiplier" min="1" max="20" step="0.1" value="2" required /></div></div>
+          <div class="section-label">매도 조건</div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseRsi" checked />RSI 이상 매도</label><div class="field"><label>RSI 기준</label><input type="number" name="sellRsi" min="1" max="100" step="0.1" value="70" required /></div></div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseMaCross" checked />MA15가 MA50을 하향 돌파</label></div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseBbUpper" checked />볼린저밴드 상단 이상 매도</label></div>
+          <div class="two"><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseTakeProfit" checked />익절</label><div class="field"><label>수익률(%)</label><input type="number" name="takeProfit" min="0.1" max="100" step="0.1" value="3" required /></div></div><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseStopLoss" checked />손절</label><div class="field"><label>손실률(%)</label><input type="number" name="stopLoss" min="0.1" max="100" step="0.1" value="2" required /></div></div></div>
+          <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseTrailing" />트레일링 스탑</label><div class="field"><label>고점 대비 하락률(%)</label><input type="number" name="trailingStop" min="0.1" max="100" step="0.1" value="2.5" required /></div></div>
           <div class="field"><label>수수료(%)</label><input type="number" name="feePct" min="0" max="1" step="0.001" value="0.05" required /></div>
           <button class="submit" type="submit">모의 테스트 실행</button>
           <div class="live-line"><span><span class="live-dot"></span> 공개 시세 자동 갱신</span><span class="status-text" id="lastUpdated">-</span></div>
@@ -194,9 +209,9 @@
     };
     const dateFromParts = (prefix) => `${form[`${prefix}Year`].value}-${form[`${prefix}Month`].value}-${form[`${prefix}Day`].value}`;
     const strategyPresets = {
-      conservative: { orderPct: 50, smaPeriod: 30, rsiPeriod: 14, bbPeriod: 20, bbMultiplier: 2.2, buyBelowSma: 2.0, buyRsi: 25, sellAboveSma: 0.8, sellRsi: 62, takeProfit: 2.0, stopLoss: 1.2 },
-      balanced: { orderPct: 75, smaPeriod: 20, rsiPeriod: 14, bbPeriod: 20, bbMultiplier: 2.0, buyBelowSma: 1.0, buyRsi: 30, sellAboveSma: 1.0, sellRsi: 70, takeProfit: 3.0, stopLoss: 2.0 },
-      aggressive: { orderPct: 100, smaPeriod: 12, rsiPeriod: 10, bbPeriod: 20, bbMultiplier: 1.8, buyBelowSma: 0.3, buyRsi: 38, sellAboveSma: 1.8, sellRsi: 78, takeProfit: 5.0, stopLoss: 3.0 }
+      conservative: { orderPct: 50, rsiPeriod: 14, volumePeriod: 20, bbPeriod: 20, bbMultiplier: 2.2, buyMode: "all", sellMode: "any", buyUseRsi: true, buyRsi: 28, buyUseMaCross: true, buyUseBbLower: false, buyUseVolumeSpike: false, buyVolumeMultiplier: 2.5, sellUseRsi: true, sellRsi: 65, sellUseMaCross: true, sellUseBbUpper: false, sellUseTakeProfit: true, takeProfit: 2.0, sellUseStopLoss: true, stopLoss: 1.2, sellUseTrailing: true, trailingStop: 1.5 },
+      balanced: { orderPct: 75, rsiPeriod: 14, volumePeriod: 20, bbPeriod: 20, bbMultiplier: 2.0, buyMode: "any", sellMode: "any", buyUseRsi: true, buyRsi: 30, buyUseMaCross: true, buyUseBbLower: true, buyUseVolumeSpike: false, buyVolumeMultiplier: 2.0, sellUseRsi: true, sellRsi: 70, sellUseMaCross: true, sellUseBbUpper: true, sellUseTakeProfit: true, takeProfit: 3.0, sellUseStopLoss: true, stopLoss: 2.0, sellUseTrailing: false, trailingStop: 2.5 },
+      aggressive: { orderPct: 100, rsiPeriod: 10, volumePeriod: 12, bbPeriod: 20, bbMultiplier: 1.8, buyMode: "any", sellMode: "any", buyUseRsi: true, buyRsi: 38, buyUseMaCross: true, buyUseBbLower: true, buyUseVolumeSpike: true, buyVolumeMultiplier: 1.6, sellUseRsi: true, sellRsi: 78, sellUseMaCross: false, sellUseBbUpper: true, sellUseTakeProfit: true, takeProfit: 5.0, sellUseStopLoss: true, stopLoss: 3.0, sellUseTrailing: true, trailingStop: 3.0 }
     };
     const selectedDateRange = () => {
       const fallback = formatDateInput(todayKst());
@@ -382,6 +397,29 @@
       };
     }
 
+    function averageVolume(data, period, index) {
+      if (index + 1 < period) return null;
+      let sum = 0;
+      for (let i = index - period + 1; i <= index; i += 1) sum += data[i].volume;
+      return sum / period;
+    }
+
+    function maCross(data, fastPeriod, slowPeriod, index, direction) {
+      if (index < slowPeriod) return false;
+      const prevFast = sma(data, fastPeriod, index - 1);
+      const prevSlow = sma(data, slowPeriod, index - 1);
+      const fast = sma(data, fastPeriod, index);
+      const slow = sma(data, slowPeriod, index);
+      if (![prevFast, prevSlow, fast, slow].every(Number.isFinite)) return false;
+      return direction === "up" ? prevFast <= prevSlow && fast > slow : prevFast >= prevSlow && fast < slow;
+    }
+
+    function passConditions(results, mode) {
+      const active = results.filter((value) => value !== null);
+      if (!active.length) return false;
+      return mode === "all" ? active.every(Boolean) : active.some(Boolean);
+    }
+
     function rsi(data, period, index) {
       if (index < period) return null;
       let gains = 0;
@@ -404,16 +442,28 @@
         ...selectedDateRange(),
         initialCash: Number(data.get("initialCash")),
         orderPct: Number(data.get("orderPct")) / 100,
-        smaPeriod: Number(data.get("smaPeriod")),
         rsiPeriod: Number(data.get("rsiPeriod")),
+        volumePeriod: Number(data.get("volumePeriod")),
         bbPeriod: Number(data.get("bbPeriod")),
         bbMultiplier: Number(data.get("bbMultiplier")),
-        buyBelowSma: Number(data.get("buyBelowSma")),
+        buyMode: data.get("buyMode"),
+        sellMode: data.get("sellMode"),
+        buyUseRsi: data.has("buyUseRsi"),
         buyRsi: Number(data.get("buyRsi")),
-        sellAboveSma: Number(data.get("sellAboveSma")),
+        buyUseMaCross: data.has("buyUseMaCross"),
+        buyUseBbLower: data.has("buyUseBbLower"),
+        buyUseVolumeSpike: data.has("buyUseVolumeSpike"),
+        buyVolumeMultiplier: Number(data.get("buyVolumeMultiplier")),
+        sellUseRsi: data.has("sellUseRsi"),
         sellRsi: Number(data.get("sellRsi")),
+        sellUseMaCross: data.has("sellUseMaCross"),
+        sellUseBbUpper: data.has("sellUseBbUpper"),
+        sellUseTakeProfit: data.has("sellUseTakeProfit"),
         takeProfit: Number(data.get("takeProfit")),
+        sellUseStopLoss: data.has("sellUseStopLoss"),
         stopLoss: Number(data.get("stopLoss")),
+        sellUseTrailing: data.has("sellUseTrailing"),
+        trailingStop: Number(data.get("trailingStop")),
         feePct: Number(data.get("feePct")) / 100
       };
     }
@@ -428,7 +478,7 @@
         const date = parseDate(row.date);
         return date >= start && date <= end;
       });
-      if (sliced.length < Math.max(config.smaPeriod, config.rsiPeriod, config.bbPeriod, 50) + 2) {
+      if (sliced.length < Math.max(config.rsiPeriod, config.bbPeriod, config.volumePeriod, 50) + 2) {
         $("dataStatus").textContent = "선택한 기간이 조건 계산에 너무 짧습니다.";
         drawMessage("선택한 기간이 너무 짧습니다.");
         return;
@@ -436,6 +486,7 @@
       let cash = config.initialCash;
       let coin = 0;
       let entryPrice = 0;
+      let highestPrice = 0;
       let wins = 0;
       let closedTrades = 0;
       let peak = config.initialCash;
@@ -445,30 +496,46 @@
       for (let i = 1; i < sliced.length; i += 1) {
         const candle = sliced[i];
         const price = candle.close;
-        const avg = sma(sliced, config.smaPeriod, i);
         const currentRsi = rsi(sliced, config.rsiPeriod, i);
+        const bands = bollinger(sliced, config.bbPeriod, config.bbMultiplier, i);
+        const previousVolumeAvg = averageVolume(sliced, config.volumePeriod, i - 1);
         const value = cash + coin * price;
         peak = Math.max(peak, value);
         maxDrawdown = Math.min(maxDrawdown, ((value - peak) / peak) * 100);
-        if (!avg || currentRsi === null) {
+        if (currentRsi === null || !bands || previousVolumeAvg === null) {
           equity.push({ date: candle.date, value });
           continue;
         }
-        const buyLine = avg * (1 - config.buyBelowSma / 100);
-        const sellLine = avg * (1 + config.sellAboveSma / 100);
         if (coin <= 0) {
-          const shouldBuy = price <= buyLine || currentRsi <= config.buyRsi;
+          const buySignals = [
+            config.buyUseRsi ? currentRsi <= config.buyRsi : null,
+            config.buyUseMaCross ? maCross(sliced, 15, 50, i, "up") : null,
+            config.buyUseBbLower ? price <= bands.lower : null,
+            config.buyUseVolumeSpike ? candle.volume >= previousVolumeAvg * config.buyVolumeMultiplier : null
+          ];
+          const shouldBuy = passConditions(buySignals, config.buyMode);
           if (shouldBuy) {
             const spend = cash * config.orderPct;
             const netSpend = spend * (1 - config.feePct);
             coin = netSpend / price;
             cash -= spend;
             entryPrice = price;
+            highestPrice = price;
             trades.push({ date: candle.date, side: "매수", price, volume: coin });
           }
         } else {
+          highestPrice = Math.max(highestPrice, price);
           const pnlPct = ((price - entryPrice) / entryPrice) * 100;
-          const shouldSell = pnlPct >= config.takeProfit || pnlPct <= -config.stopLoss || price >= sellLine || currentRsi >= config.sellRsi;
+          const trailingPct = ((price - highestPrice) / highestPrice) * 100;
+          const sellSignals = [
+            config.sellUseRsi ? currentRsi >= config.sellRsi : null,
+            config.sellUseMaCross ? maCross(sliced, 15, 50, i, "down") : null,
+            config.sellUseBbUpper ? price >= bands.upper : null,
+            config.sellUseTakeProfit ? pnlPct >= config.takeProfit : null,
+            config.sellUseStopLoss ? pnlPct <= -config.stopLoss : null,
+            config.sellUseTrailing ? trailingPct <= -config.trailingStop : null
+          ];
+          const shouldSell = passConditions(sellSignals, config.sellMode);
           if (shouldSell) {
             const gross = coin * price;
             const net = gross * (1 - config.feePct);
@@ -478,6 +545,7 @@
             trades.push({ date: candle.date, side: "매도", price, volume: coin });
             coin = 0;
             entryPrice = 0;
+            highestPrice = 0;
           }
         }
         equity.push({ date: candle.date, value: cash + coin * price });
@@ -592,7 +660,6 @@
       }
       drawIndicator("#f0b90b", 1.5, (sourceIndex) => sma(data, 15, sourceIndex));
       drawIndicator("#a78bfa", 1.5, (sourceIndex) => sma(data, 50, sourceIndex));
-      drawIndicator("#72a8ff", 1.2, (sourceIndex) => sma(data, config.smaPeriod, sourceIndex));
       drawIndicator("#8b98a9", 1, (sourceIndex) => bollinger(data, config.bbPeriod, config.bbMultiplier, sourceIndex)?.upper, [5, 4]);
       drawIndicator("#8b98a9", 1, (sourceIndex) => bollinger(data, config.bbPeriod, config.bbMultiplier, sourceIndex)?.lower, [5, 4]);
       trades.forEach((trade) => {
@@ -614,7 +681,6 @@
       const legend = [
         ["#f0b90b", "MA15"],
         ["#a78bfa", "MA50"],
-        ["#72a8ff", `SMA ${config.smaPeriod}`],
         ["#8b98a9", `BB ${config.bbPeriod}/${config.bbMultiplier}`],
         ["#0ecb81", "자산 곡선"]
       ];
@@ -669,9 +735,22 @@
       const preset = strategyPresets[name];
       if (!preset) return;
       Object.entries(preset).forEach(([key, value]) => {
-        if (form[key]) form[key].value = value;
+        if (!form[key]) return;
+        if (form[key].type === "checkbox") form[key].checked = Boolean(value);
+        else form[key].value = value;
       });
+      updateConditionInputs();
       runBacktest();
+    }
+
+    function updateConditionInputs() {
+      document.querySelectorAll(".condition").forEach((condition) => {
+        const checkbox = condition.querySelector("input[type='checkbox']");
+        if (!checkbox) return;
+        condition.querySelectorAll("input[type='number'], select").forEach((control) => {
+          control.disabled = !checkbox.checked;
+        });
+      });
     }
 
     function panChart(clientX) {
@@ -687,9 +766,10 @@
     form.market.addEventListener("change", () => loadCandles());
     form.interval.addEventListener("change", () => loadCandles());
     form.strategyPreset.addEventListener("change", () => applyStrategyPreset(form.strategyPreset.value));
-    ["orderPct", "smaPeriod", "rsiPeriod", "bbPeriod", "bbMultiplier", "buyBelowSma", "buyRsi", "sellAboveSma", "sellRsi", "takeProfit", "stopLoss", "feePct"].forEach((name) => {
+    ["orderPct", "rsiPeriod", "volumePeriod", "bbPeriod", "bbMultiplier", "buyMode", "sellMode", "buyUseRsi", "buyRsi", "buyUseMaCross", "buyUseBbLower", "buyUseVolumeSpike", "buyVolumeMultiplier", "sellUseRsi", "sellRsi", "sellUseMaCross", "sellUseBbUpper", "sellUseTakeProfit", "takeProfit", "sellUseStopLoss", "stopLoss", "sellUseTrailing", "trailingStop", "feePct"].forEach((name) => {
       form[name].addEventListener("change", () => {
         form.strategyPreset.value = "custom";
+        updateConditionInputs();
         runBacktest();
       });
     });
@@ -712,6 +792,7 @@
     canvas.addEventListener("pointerup", () => { isDraggingChart = false; });
     canvas.addEventListener("pointercancel", () => { isDraggingChart = false; });
     window.addEventListener("resize", () => { if (candles.length) runBacktest(); });
+    updateConditionInputs();
     loadCandles()
       .then(startLiveRefresh);
   </script>

@@ -137,15 +137,6 @@
               <select name="endDay" aria-label="종료 일"></select>
             </div>
           </div>
-          <div class="field">
-            <label>전략 선택</label>
-            <select name="strategyPreset">
-              <option value="balanced" selected>균형형: 일반적인 자동매매</option>
-              <option value="conservative">보수형: 덜 사고 빨리 방어</option>
-              <option value="aggressive">공격형: 더 자주 진입</option>
-              <option value="custom">직접 설정</option>
-            </select>
-          </div>
           <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="75" required /></div>
           <div class="two"><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div><div class="field"><label>거래량 평균 기간</label><input type="number" name="volumePeriod" min="2" max="200" step="1" value="20" required /></div></div>
           <div class="two"><div class="field"><label>볼린저 기간</label><input type="number" name="bbPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>볼린저 배수</label><input type="number" name="bbMultiplier" min="0.5" max="5" step="0.1" value="2" required /></div></div>
@@ -208,11 +199,6 @@
       return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     };
     const dateFromParts = (prefix) => `${form[`${prefix}Year`].value}-${form[`${prefix}Month`].value}-${form[`${prefix}Day`].value}`;
-    const strategyPresets = {
-      conservative: { orderPct: 50, rsiPeriod: 14, volumePeriod: 20, bbPeriod: 20, bbMultiplier: 2.2, buyMode: "all", sellMode: "any", buyUseRsi: true, buyRsi: 28, buyUseMaCross: true, buyUseBbLower: false, buyUseVolumeSpike: false, buyVolumeMultiplier: 2.5, sellUseRsi: true, sellRsi: 65, sellUseMaCross: true, sellUseBbUpper: false, sellUseTakeProfit: true, takeProfit: 2.0, sellUseStopLoss: true, stopLoss: 1.2, sellUseTrailing: true, trailingStop: 1.5 },
-      balanced: { orderPct: 75, rsiPeriod: 14, volumePeriod: 20, bbPeriod: 20, bbMultiplier: 2.0, buyMode: "any", sellMode: "any", buyUseRsi: true, buyRsi: 30, buyUseMaCross: true, buyUseBbLower: true, buyUseVolumeSpike: false, buyVolumeMultiplier: 2.0, sellUseRsi: true, sellRsi: 70, sellUseMaCross: true, sellUseBbUpper: true, sellUseTakeProfit: true, takeProfit: 3.0, sellUseStopLoss: true, stopLoss: 2.0, sellUseTrailing: false, trailingStop: 2.5 },
-      aggressive: { orderPct: 100, rsiPeriod: 10, volumePeriod: 12, bbPeriod: 20, bbMultiplier: 1.8, buyMode: "any", sellMode: "any", buyUseRsi: true, buyRsi: 38, buyUseMaCross: true, buyUseBbLower: true, buyUseVolumeSpike: true, buyVolumeMultiplier: 1.6, sellUseRsi: true, sellRsi: 78, sellUseMaCross: false, sellUseBbUpper: true, sellUseTakeProfit: true, takeProfit: 5.0, sellUseStopLoss: true, stopLoss: 3.0, sellUseTrailing: true, trailingStop: 3.0 }
-    };
     const selectedDateRange = () => {
       const fallback = formatDateInput(todayKst());
       return {
@@ -731,18 +717,6 @@
       setSelectDate("end", endDate);
     }
 
-    function applyStrategyPreset(name) {
-      const preset = strategyPresets[name];
-      if (!preset) return;
-      Object.entries(preset).forEach(([key, value]) => {
-        if (!form[key]) return;
-        if (form[key].type === "checkbox") form[key].checked = Boolean(value);
-        else form[key].value = value;
-      });
-      updateConditionInputs();
-      runBacktest();
-    }
-
     function updateConditionInputs() {
       document.querySelectorAll(".condition").forEach((condition) => {
         const checkbox = condition.querySelector("input[type='checkbox']");
@@ -765,10 +739,8 @@
     form.addEventListener("submit", (event) => { event.preventDefault(); runBacktest(); });
     form.market.addEventListener("change", () => loadCandles());
     form.interval.addEventListener("change", () => loadCandles());
-    form.strategyPreset.addEventListener("change", () => applyStrategyPreset(form.strategyPreset.value));
     ["orderPct", "rsiPeriod", "volumePeriod", "bbPeriod", "bbMultiplier", "buyMode", "sellMode", "buyUseRsi", "buyRsi", "buyUseMaCross", "buyUseBbLower", "buyUseVolumeSpike", "buyVolumeMultiplier", "sellUseRsi", "sellRsi", "sellUseMaCross", "sellUseBbUpper", "sellUseTakeProfit", "takeProfit", "sellUseStopLoss", "stopLoss", "sellUseTrailing", "trailingStop", "feePct"].forEach((name) => {
       form[name].addEventListener("change", () => {
-        form.strategyPreset.value = "custom";
         updateConditionInputs();
         runBacktest();
       });

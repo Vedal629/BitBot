@@ -144,11 +144,15 @@
           <div class="two"><div class="field"><label>매수 조합</label><select name="buyMode"><option value="any" selected>하나라도 만족</option><option value="all">모두 만족</option></select></div><div class="field"><label>매도 조합</label><select name="sellMode"><option value="any" selected>하나라도 만족</option><option value="all">모두 만족</option></select></div></div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseRsi" checked />RSI 이하 매수</label><div class="field"><label>RSI 기준</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseMaCross" checked />MA15가 MA50을 상향 돌파</label></div>
+          <div class="two"><div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseMa15CrossUp" />가격이 MA15 상향 돌파</label></div><div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseMa15CrossDown" />가격이 MA15 하향 돌파</label></div></div>
+          <div class="two"><div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseMa50CrossUp" />가격이 MA50 상향 돌파</label></div><div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseMa50CrossDown" />가격이 MA50 하향 돌파</label></div></div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseBbLower" checked />볼린저밴드 하단 이하 매수</label></div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="buyUseVolumeSpike" />거래량 급증 매수</label><div class="field"><label>평균 거래량 대비 배수</label><input type="number" name="buyVolumeMultiplier" min="1" max="20" step="0.1" value="2" required /></div></div>
           <div class="section-label">매도 조건</div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseRsi" checked />RSI 이상 매도</label><div class="field"><label>RSI 기준</label><input type="number" name="sellRsi" min="1" max="100" step="0.1" value="70" required /></div></div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseMaCross" checked />MA15가 MA50을 하향 돌파</label></div>
+          <div class="two"><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseMa15CrossUp" />가격이 MA15 상향 돌파</label></div><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseMa15CrossDown" />가격이 MA15 하향 돌파</label></div></div>
+          <div class="two"><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseMa50CrossUp" />가격이 MA50 상향 돌파</label></div><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseMa50CrossDown" />가격이 MA50 하향 돌파</label></div></div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseBbUpper" checked />볼린저밴드 상단 이상 매도</label></div>
           <div class="two"><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseTakeProfit" checked />익절</label><div class="field"><label>수익률(%)</label><input type="number" name="takeProfit" min="0.1" max="100" step="0.1" value="3" required /></div></div><div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseStopLoss" checked />손절</label><div class="field"><label>손실률(%)</label><input type="number" name="stopLoss" min="0.1" max="100" step="0.1" value="2" required /></div></div></div>
           <div class="condition"><label class="condition-head"><input type="checkbox" name="sellUseTrailing" />트레일링 스탑</label><div class="field"><label>고점 대비 하락률(%)</label><input type="number" name="trailingStop" min="0.1" max="100" step="0.1" value="2.5" required /></div></div>
@@ -400,6 +404,18 @@
       return direction === "up" ? prevFast <= prevSlow && fast > slow : prevFast >= prevSlow && fast < slow;
     }
 
+    function priceCrossMa(data, period, index, direction) {
+      if (index < period) return false;
+      const prevMa = sma(data, period, index - 1);
+      const currentMa = sma(data, period, index);
+      const prevClose = data[index - 1].close;
+      const currentClose = data[index].close;
+      if (![prevMa, currentMa, prevClose, currentClose].every(Number.isFinite)) return false;
+      return direction === "up"
+        ? prevClose <= prevMa && currentClose > currentMa
+        : prevClose >= prevMa && currentClose < currentMa;
+    }
+
     function passConditions(results, mode) {
       const active = results.filter((value) => value !== null);
       if (!active.length) return false;
@@ -437,12 +453,20 @@
         buyUseRsi: data.has("buyUseRsi"),
         buyRsi: Number(data.get("buyRsi")),
         buyUseMaCross: data.has("buyUseMaCross"),
+        buyUseMa15CrossUp: data.has("buyUseMa15CrossUp"),
+        buyUseMa15CrossDown: data.has("buyUseMa15CrossDown"),
+        buyUseMa50CrossUp: data.has("buyUseMa50CrossUp"),
+        buyUseMa50CrossDown: data.has("buyUseMa50CrossDown"),
         buyUseBbLower: data.has("buyUseBbLower"),
         buyUseVolumeSpike: data.has("buyUseVolumeSpike"),
         buyVolumeMultiplier: Number(data.get("buyVolumeMultiplier")),
         sellUseRsi: data.has("sellUseRsi"),
         sellRsi: Number(data.get("sellRsi")),
         sellUseMaCross: data.has("sellUseMaCross"),
+        sellUseMa15CrossUp: data.has("sellUseMa15CrossUp"),
+        sellUseMa15CrossDown: data.has("sellUseMa15CrossDown"),
+        sellUseMa50CrossUp: data.has("sellUseMa50CrossUp"),
+        sellUseMa50CrossDown: data.has("sellUseMa50CrossDown"),
         sellUseBbUpper: data.has("sellUseBbUpper"),
         sellUseTakeProfit: data.has("sellUseTakeProfit"),
         takeProfit: Number(data.get("takeProfit")),
@@ -496,6 +520,10 @@
           const buySignals = [
             config.buyUseRsi ? currentRsi <= config.buyRsi : null,
             config.buyUseMaCross ? maCross(sliced, 15, 50, i, "up") : null,
+            config.buyUseMa15CrossUp ? priceCrossMa(sliced, 15, i, "up") : null,
+            config.buyUseMa15CrossDown ? priceCrossMa(sliced, 15, i, "down") : null,
+            config.buyUseMa50CrossUp ? priceCrossMa(sliced, 50, i, "up") : null,
+            config.buyUseMa50CrossDown ? priceCrossMa(sliced, 50, i, "down") : null,
             config.buyUseBbLower ? price <= bands.lower : null,
             config.buyUseVolumeSpike ? candle.volume >= previousVolumeAvg * config.buyVolumeMultiplier : null
           ];
@@ -516,6 +544,10 @@
           const sellSignals = [
             config.sellUseRsi ? currentRsi >= config.sellRsi : null,
             config.sellUseMaCross ? maCross(sliced, 15, 50, i, "down") : null,
+            config.sellUseMa15CrossUp ? priceCrossMa(sliced, 15, i, "up") : null,
+            config.sellUseMa15CrossDown ? priceCrossMa(sliced, 15, i, "down") : null,
+            config.sellUseMa50CrossUp ? priceCrossMa(sliced, 50, i, "up") : null,
+            config.sellUseMa50CrossDown ? priceCrossMa(sliced, 50, i, "down") : null,
             config.sellUseBbUpper ? price >= bands.upper : null,
             config.sellUseTakeProfit ? pnlPct >= config.takeProfit : null,
             config.sellUseStopLoss ? pnlPct <= -config.stopLoss : null,
@@ -739,7 +771,7 @@
     form.addEventListener("submit", (event) => { event.preventDefault(); runBacktest(); });
     form.market.addEventListener("change", () => loadCandles());
     form.interval.addEventListener("change", () => loadCandles());
-    ["orderPct", "rsiPeriod", "volumePeriod", "bbPeriod", "bbMultiplier", "buyMode", "sellMode", "buyUseRsi", "buyRsi", "buyUseMaCross", "buyUseBbLower", "buyUseVolumeSpike", "buyVolumeMultiplier", "sellUseRsi", "sellRsi", "sellUseMaCross", "sellUseBbUpper", "sellUseTakeProfit", "takeProfit", "sellUseStopLoss", "stopLoss", "sellUseTrailing", "trailingStop", "feePct"].forEach((name) => {
+    ["orderPct", "rsiPeriod", "volumePeriod", "bbPeriod", "bbMultiplier", "buyMode", "sellMode", "buyUseRsi", "buyRsi", "buyUseMaCross", "buyUseMa15CrossUp", "buyUseMa15CrossDown", "buyUseMa50CrossUp", "buyUseMa50CrossDown", "buyUseBbLower", "buyUseVolumeSpike", "buyVolumeMultiplier", "sellUseRsi", "sellRsi", "sellUseMaCross", "sellUseMa15CrossUp", "sellUseMa15CrossDown", "sellUseMa50CrossUp", "sellUseMa50CrossDown", "sellUseBbUpper", "sellUseTakeProfit", "takeProfit", "sellUseStopLoss", "stopLoss", "sellUseTrailing", "trailingStop", "feePct"].forEach((name) => {
       form[name].addEventListener("change", () => {
         updateConditionInputs();
         runBacktest();

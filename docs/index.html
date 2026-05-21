@@ -142,6 +142,7 @@
           </div>
           <div class="field"><label>주문 비중(%)</label><input type="number" name="orderPct" min="1" max="100" step="1" value="100" required /></div>
           <div class="two"><div class="field"><label>SMA 기간</label><input type="number" name="smaPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>RSI 기간</label><input type="number" name="rsiPeriod" min="2" max="100" step="1" value="14" required /></div></div>
+          <div class="two"><div class="field"><label>볼린저 기간</label><input type="number" name="bbPeriod" min="2" max="200" step="1" value="20" required /></div><div class="field"><label>볼린저 배수</label><input type="number" name="bbMultiplier" min="0.5" max="5" step="0.1" value="2" required /></div></div>
           <div class="two"><div class="field"><label>매수: SMA보다 낮음(%)</label><input type="number" name="buyBelowSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매수: RSI 이하</label><input type="number" name="buyRsi" min="1" max="100" step="0.1" value="30" required /></div></div>
           <div class="two"><div class="field"><label>매도: SMA보다 높음(%)</label><input type="number" name="sellAboveSma" min="0" max="50" step="0.1" value="1.0" required /></div><div class="field"><label>매도: RSI 이상</label><input type="number" name="sellRsi" min="1" max="100" step="0.1" value="70" required /></div></div>
           <div class="two"><div class="field"><label>익절(%)</label><input type="number" name="takeProfit" min="0.1" max="100" step="0.1" value="3" required /></div><div class="field"><label>손절(%)</label><input type="number" name="stopLoss" min="0.1" max="100" step="0.1" value="2" required /></div></div>
@@ -188,9 +189,9 @@
     };
     const dateFromParts = (prefix) => `${form[`${prefix}Year`].value}-${form[`${prefix}Month`].value}-${form[`${prefix}Day`].value}`;
     const strategyPresets = {
-      conservative: { orderPct: 50, smaPeriod: 30, rsiPeriod: 14, buyBelowSma: 2.0, buyRsi: 25, sellAboveSma: 0.8, sellRsi: 62, takeProfit: 2.0, stopLoss: 1.2 },
-      balanced: { orderPct: 75, smaPeriod: 20, rsiPeriod: 14, buyBelowSma: 1.0, buyRsi: 30, sellAboveSma: 1.0, sellRsi: 70, takeProfit: 3.0, stopLoss: 2.0 },
-      aggressive: { orderPct: 100, smaPeriod: 12, rsiPeriod: 10, buyBelowSma: 0.3, buyRsi: 38, sellAboveSma: 1.8, sellRsi: 78, takeProfit: 5.0, stopLoss: 3.0 }
+      conservative: { orderPct: 50, smaPeriod: 30, rsiPeriod: 14, bbPeriod: 20, bbMultiplier: 2.2, buyBelowSma: 2.0, buyRsi: 25, sellAboveSma: 0.8, sellRsi: 62, takeProfit: 2.0, stopLoss: 1.2 },
+      balanced: { orderPct: 75, smaPeriod: 20, rsiPeriod: 14, bbPeriod: 20, bbMultiplier: 2.0, buyBelowSma: 1.0, buyRsi: 30, sellAboveSma: 1.0, sellRsi: 70, takeProfit: 3.0, stopLoss: 2.0 },
+      aggressive: { orderPct: 100, smaPeriod: 12, rsiPeriod: 10, bbPeriod: 20, bbMultiplier: 1.8, buyBelowSma: 0.3, buyRsi: 38, sellAboveSma: 1.8, sellRsi: 78, takeProfit: 5.0, stopLoss: 3.0 }
     };
     const selectedDateRange = () => {
       const fallback = formatDateInput(todayKst());
@@ -303,6 +304,26 @@
       return sum / period;
     }
 
+    function stddev(data, period, index, avg) {
+      if (avg === null) return null;
+      let variance = 0;
+      for (let i = index - period + 1; i <= index; i += 1) {
+        variance += (data[i].close - avg) ** 2;
+      }
+      return Math.sqrt(variance / period);
+    }
+
+    function bollinger(data, period, multiplier, index) {
+      const middle = sma(data, period, index);
+      const deviation = stddev(data, period, index, middle);
+      if (middle === null || deviation === null) return null;
+      return {
+        upper: middle + deviation * multiplier,
+        middle,
+        lower: middle - deviation * multiplier
+      };
+    }
+
     function rsi(data, period, index) {
       if (index < period) return null;
       let gains = 0;
@@ -327,6 +348,8 @@
         orderPct: Number(data.get("orderPct")) / 100,
         smaPeriod: Number(data.get("smaPeriod")),
         rsiPeriod: Number(data.get("rsiPeriod")),
+        bbPeriod: Number(data.get("bbPeriod")),
+        bbMultiplier: Number(data.get("bbMultiplier")),
         buyBelowSma: Number(data.get("buyBelowSma")),
         buyRsi: Number(data.get("buyRsi")),
         sellAboveSma: Number(data.get("sellAboveSma")),
@@ -347,7 +370,7 @@
         const date = parseDate(row.date);
         return date >= start && date <= end;
       });
-      if (sliced.length < Math.max(config.smaPeriod, config.rsiPeriod) + 2) {
+      if (sliced.length < Math.max(config.smaPeriod, config.rsiPeriod, config.bbPeriod, 50) + 2) {
         $("dataStatus").textContent = "선택한 기간이 조건 계산에 너무 짧습니다.";
         drawMessage("선택한 기간이 너무 짧습니다.");
         return;
@@ -447,10 +470,19 @@
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       const width = rect.width;
       const height = rect.height;
-      const pad = { top: 22, right: 70, bottom: 42, left: 16 };
+      const pad = { top: width < 620 ? 42 : 24, right: 70, bottom: 42, left: 16 };
       const chartW = width - pad.left - pad.right;
       const chartH = height - pad.top - pad.bottom;
       const prices = visibleData.flatMap((row) => [row.high, row.low]);
+      visibleData.forEach((_, index) => {
+        const sourceIndex = chartViewStart + index;
+        const ma15 = sma(data, 15, sourceIndex);
+        const ma50 = sma(data, 50, sourceIndex);
+        const bands = bollinger(data, config.bbPeriod, config.bbMultiplier, sourceIndex);
+        [ma15, ma50, bands?.upper, bands?.lower].forEach((value) => {
+          if (Number.isFinite(value)) prices.push(value);
+        });
+      });
       const min = Math.min(...prices);
       const max = Math.max(...prices);
       const priceRange = Math.max(max - min, 1);
@@ -478,21 +510,33 @@
         const bottom = y(Math.min(row.open, row.close));
         ctx.fillRect(cx - candleW / 2, top, candleW, Math.max(1, bottom - top));
       });
-      ctx.strokeStyle = "#f0b90b"; ctx.lineWidth = 1.5; ctx.beginPath();
-      let smaStarted = false;
-      visibleData.forEach((_, index) => {
-        const sourceIndex = chartViewStart + index;
-        const avg = sma(data, config.smaPeriod, sourceIndex);
-        if (!avg) return;
-        const px = x(index); const py = y(avg);
-        if (!smaStarted) {
-          ctx.moveTo(px, py);
-          smaStarted = true;
-        } else {
-          ctx.lineTo(px, py);
-        }
-      });
-      ctx.stroke();
+      function drawIndicator(color, lineWidth, getValue, dash = []) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lineWidth;
+        ctx.setLineDash(dash);
+        ctx.beginPath();
+        let started = false;
+        visibleData.forEach((_, index) => {
+          const sourceIndex = chartViewStart + index;
+          const value = getValue(sourceIndex);
+          if (!Number.isFinite(value)) return;
+          const px = x(index);
+          const py = y(value);
+          if (!started) {
+            ctx.moveTo(px, py);
+            started = true;
+          } else {
+            ctx.lineTo(px, py);
+          }
+        });
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      drawIndicator("#f0b90b", 1.5, (sourceIndex) => sma(data, 15, sourceIndex));
+      drawIndicator("#a78bfa", 1.5, (sourceIndex) => sma(data, 50, sourceIndex));
+      drawIndicator("#72a8ff", 1.2, (sourceIndex) => sma(data, config.smaPeriod, sourceIndex));
+      drawIndicator("#8b98a9", 1, (sourceIndex) => bollinger(data, config.bbPeriod, config.bbMultiplier, sourceIndex)?.upper, [5, 4]);
+      drawIndicator("#8b98a9", 1, (sourceIndex) => bollinger(data, config.bbPeriod, config.bbMultiplier, sourceIndex)?.lower, [5, 4]);
       trades.forEach((trade) => {
         const sourceIndex = data.findIndex((row) => row.date === trade.date);
         if (sourceIndex < chartViewStart || sourceIndex >= viewEnd) return;
@@ -509,12 +553,27 @@
         ctx.stroke();
       }
       ctx.fillStyle = "#8b98a9"; ctx.font = "12px system-ui"; ctx.fillText(visibleData[0].date, pad.left, height - 16); ctx.fillText(visibleData[visibleData.length - 1].date, width - pad.right - 18, height - 16);
-      ctx.fillStyle = "#f0b90b"; ctx.fillText(`SMA ${config.smaPeriod}`, pad.left + 8, pad.top + 16);
-      ctx.fillStyle = "#0ecb81"; ctx.fillText("자산 곡선", pad.left + 76, pad.top + 16);
-      if (data.length > chartViewSize) {
-        ctx.fillStyle = "#8b98a9";
-        ctx.fillText("차트를 드래그해 과거 구간 이동", pad.left + 150, pad.top + 16);
-      }
+      const legend = [
+        ["#f0b90b", "MA15"],
+        ["#a78bfa", "MA50"],
+        ["#72a8ff", `SMA ${config.smaPeriod}`],
+        ["#8b98a9", `BB ${config.bbPeriod}/${config.bbMultiplier}`],
+        ["#0ecb81", "자산 곡선"]
+      ];
+      if (data.length > chartViewSize) legend.push(["#8b98a9", "드래그로 과거 이동"]);
+      let legendX = pad.left + 8;
+      let legendY = 18;
+      const legendRight = width - pad.right - 8;
+      legend.forEach(([color, text]) => {
+        const textW = ctx.measureText(text).width + 18;
+        if (legendX + textW > legendRight && legendX > pad.left + 8) {
+          legendX = pad.left + 8;
+          legendY += 16;
+        }
+        ctx.fillStyle = color;
+        ctx.fillText(text, legendX, legendY);
+        legendX += textW;
+      });
     }
 
     function drawMessage(message) {
@@ -570,7 +629,7 @@
     form.market.addEventListener("change", () => loadCandles());
     form.interval.addEventListener("change", () => loadCandles());
     form.strategyPreset.addEventListener("change", () => applyStrategyPreset(form.strategyPreset.value));
-    ["orderPct", "smaPeriod", "rsiPeriod", "buyBelowSma", "buyRsi", "sellAboveSma", "sellRsi", "takeProfit", "stopLoss", "feePct"].forEach((name) => {
+    ["orderPct", "smaPeriod", "rsiPeriod", "bbPeriod", "bbMultiplier", "buyBelowSma", "buyRsi", "sellAboveSma", "sellRsi", "takeProfit", "stopLoss", "feePct"].forEach((name) => {
       form[name].addEventListener("change", () => {
         form.strategyPreset.value = "custom";
         runBacktest();

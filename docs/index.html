@@ -195,6 +195,9 @@
     let refreshTimer = null;
     let lastSuccessfulLoad = null;
     let candleSetKey = "";
+    let loadRequestId = 0;
+    let isLoadingCandles = false;
+    let userChangedDateRange = false;
     const CACHE_TTL_MS = 10 * 60 * 1000;
     const DIRECT_FETCH_TIMEOUT_MS = 2500;
     const FALLBACK_FETCH_TIMEOUT_MS = 4500;
@@ -330,6 +333,9 @@
     }
 
     async function loadCandles(options = {}) {
+      if (isLoadingCandles && options.quick) return;
+      const requestId = ++loadRequestId;
+      isLoadingCandles = true;
       const config = readConfig();
       const nextCacheKey = cacheKey(config.market, config.interval);
       if (candleSetKey && candleSetKey !== nextCacheKey) {
@@ -353,27 +359,33 @@
       }
       try {
         const fresh = await fetchUpbitCandles(config.market, config.interval, options.quick ? 1 : undefined);
+        if (requestId !== loadRequestId) return;
         candles = options.quick && candles.length ? mergeCandles(candles, fresh) : fresh;
         candleSetKey = nextCacheKey;
         writeCachedCandles(config.market, config.interval, candles);
         $("marketName").textContent = config.market;
         $("dataStatus").textContent = `${config.market} ${config.interval === "days" ? "일봉" : `${config.interval}분봉`} 실시간 차트입니다.`;
         lastSuccessfulLoad = new Date();
+        if (!candles.length) throw new Error("표시할 캔들 데이터가 없습니다.");
+        if (!options.keepDates) setupDateSelects();
+        else if (!userChangedDateRange) setDefaultDateRange();
+        $("lastUpdated").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+        runBacktest();
       } catch (error) {
+        if (requestId !== loadRequestId) return;
         console.error(error);
         if (candles.length) {
           const time = lastSuccessfulLoad ? lastSuccessfulLoad.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "이전";
           $("dataStatus").textContent = `새 데이터 요청이 지연되어 ${time} 데이터를 유지 중입니다.`;
+          runBacktest();
           return;
         }
         $("dataStatus").textContent = "시세 연결을 재시도하는 중입니다.";
         drawMessage("시세 연결을 재시도하는 중입니다.");
         return;
+      } finally {
+        if (requestId === loadRequestId) isLoadingCandles = false;
       }
-      if (!candles.length) throw new Error("표시할 캔들 데이터가 없습니다.");
-      if (!options.keepDates) setupDateSelects();
-      $("lastUpdated").textContent = `마지막 갱신 ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
-      runBacktest();
     }
 
     function sma(data, period, index) {
@@ -782,6 +794,11 @@
       refreshTimer = setInterval(() => loadCandles({ keepDates: true, silent: true, quick: true }), 60000);
     }
 
+    function refreshVisibleChart() {
+      if (document.hidden) return;
+      loadCandles({ keepDates: true, silent: true, quick: true });
+    }
+
     function setDefaultDateRange() {
       if (!form.startYear.options.length || !form.endYear.options.length) return;
       const end = todayKst();
@@ -823,6 +840,7 @@
     });
     ["startYear", "startMonth", "startDay", "endYear", "endMonth", "endDay"].forEach((name) => {
       form[name].addEventListener("change", () => {
+        userChangedDateRange = true;
         runBacktest();
       });
     });
@@ -840,6 +858,8 @@
     canvas.addEventListener("pointerup", () => { isDraggingChart = false; });
     canvas.addEventListener("pointercancel", () => { isDraggingChart = false; });
     window.addEventListener("resize", () => { if (candles.length) runBacktest(); });
+    window.addEventListener("focus", refreshVisibleChart);
+    document.addEventListener("visibilitychange", refreshVisibleChart);
     updateConditionInputs();
     loadCandles()
       .then(startLiveRefresh);
